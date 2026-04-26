@@ -1,0 +1,3 @@
+[submodule "activation-vector-steering-llms-mechanistic-interpretability"]
+	path = activation-vector-steering-llms-mechanistic-interpretability
+	url = https://github.com/BurnyCoder/activation-vector-steering-llms-mechanistic-interpretability
