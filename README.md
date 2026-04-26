@@ -1,0 +1,1 @@
+Finding and applying steering vectors to LLMs to increase performance on physics problems. LLM steering vectors are directions in a model's activation space that, when added to its hidden states at inference time, push the model's behavior toward or away from a specific concept or trait (like honesty, refusal, or sycophancy) without retraining the weights.
