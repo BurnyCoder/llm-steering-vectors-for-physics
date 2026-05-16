@@ -73,4 +73,8 @@ def model_device(model: torch.nn.Module) -> torch.device:
     - Prevents CPU/GPU mismatch during generation.
     """
 
-    return getattr(model, "device", next(model.parameters()).device)  # Local: prefer HF device attr, fallback to first param. Global: route tensors to model.
+    device = getattr(model, "device", None)  # Local: prefer HF device attr when exposed. Global: route tensors to model.
+    if device is not None:
+        return torch.device(device)  # Local: normalize strings/devices. Global: keep tokenizer batch movement predictable.
+
+    return next(model.parameters()).device  # Local: fallback to first parameter. Global: support plain PyTorch modules.
