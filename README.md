@@ -1,9 +1,9 @@
 # LLM Steering Vectors for Physics
 
 This repository is a research project for testing whether activation steering can improve
-small Qwen model performance on physics questions.
+small Qwen LLM model performance on physics questions.
 
-The experiment uses `Qwen/Qwen3.5-0.8B`, mines correct and incorrect model-generated
+The experiment uses Qwen LLM, mines correct and incorrect model-generated
 MMLU-Pro Physics responses from validation rows, trains steering vectors from those generated
 responses, applies the vectors during generation, and compares benchmark accuracy against an
 unsteered baseline.
