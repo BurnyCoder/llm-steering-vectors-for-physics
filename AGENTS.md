@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This is a Python 3.11 research package using a `src` layout. Runtime code lives in `src/physics_steering_vectors/`. The entry points are `main.py` for the experiment protocol and `__main__.py` for `python -m physics_steering_vectors`. Configuration is centralized in `config.py`; phase orchestration is in `phases.py`; shared model completion is in `generation.py`; domain logic is split across `data.py`, `modeling.py`, `steering.py`, `evaluation.py`, `answer_extraction.py`, `layers.py`, and `reporting.py`. Shared dataclasses live in `schemas.py`. There is no committed test suite yet; add tests under `tests/` using names like `tests/test_answer_extraction.py`.
+This is a Python 3.11 research package using a `src` layout. Runtime code lives in `src/physics_steering_vectors/`. The entry points are `main.py` for the experiment protocol and `__main__.py` for `python -m physics_steering_vectors`. Configuration is centralized in `config.py`; phase orchestration is in `phases.py`; shared model completion is in `generation.py`; data loading and prompt formatting live in `data.py`; generated-response mining and contrast-pair assembly live in `activation_collection.py`; model loading, vector training, evaluation, answer extraction, layer inference, and reporting live in `modeling.py`, `steering.py`, `evaluation.py`, `answer_extraction.py`, `layers.py`, and `reporting.py`. Shared dataclasses live in `schemas.py`. There is no committed test suite yet; add tests under `tests/` using names like `tests/test_answer_extraction.py`.
 
 ## Build, Test, and Development Commands
 
@@ -25,11 +25,11 @@ For a quick smoke run, temporarily set `max_test_examples` to a small value such
 
 ## Coding Style & Naming Conventions
 
-Follow the existing Python style: four-space indentation, type hints, dataclasses for structured records, and small modules with explicit phase boundaries. Use `snake_case` for functions, variables, and modules; use `PascalCase` for dataclasses. Keep experiment constants in `ExperimentConfig` rather than scattering literals across modules. Keep model completion code centralized in `generation.py`; training-response mining and evaluation should call the shared helper rather than duplicating tokenizer/generate/decode logic. Training contrast pairs should come from actual model-generated validation responses classified by extracted answer correctness. Do not recreate the old rule-based negative path by editing only final answer letters. Avoid introducing `pip`, `conda`, or ad hoc environment files; dependencies belong in `pyproject.toml`.
+Follow the existing Python style: four-space indentation, type hints, dataclasses for structured records, and small modules with explicit phase boundaries. Use `snake_case` for functions, variables, and modules; use `PascalCase` for dataclasses. Keep experiment constants in `ExperimentConfig` rather than scattering literals across modules. Keep model completion code centralized in `generation.py`; training-response mining belongs in `activation_collection.py`, and both activation collection and evaluation should call the shared generation helper rather than duplicating tokenizer/generate/decode logic. Training contrast pairs should come from actual model-generated validation responses classified by extracted answer correctness. Do not recreate the old rule-based negative path by editing only final answer letters. Avoid introducing `pip`, `conda`, or ad hoc environment files; dependencies belong in `pyproject.toml`.
 
 ## Testing Guidelines
 
-Prefer focused unit tests for deterministic logic such as answer extraction, result aggregation, prompt formatting, and layer-name inference. Mock Hugging Face model and dataset calls where possible so tests do not require GPU access or network downloads. If `pytest` is added, run tests with:
+Prefer focused unit tests for deterministic logic such as answer extraction, result aggregation, prompt formatting, and layer-name inference. Mock Hugging Face model and dataset calls where possible so tests do not require GPU access or network downloads. Run tests with:
 
 ```bash
 uv run pytest

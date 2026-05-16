@@ -12,8 +12,9 @@ Global Role:
 - Makes `main.py` read like the experiment protocol.
 """
 
+from physics_steering_vectors.activation_collection import build_training_pairs  # Local: mine contrast pairs. Global: vector training input.
 from physics_steering_vectors.config import ExperimentConfig  # Local: phase settings. Global: single protocol object.
-from physics_steering_vectors.data import build_training_pairs, load_physics_splits  # Local: data functions. Global: benchmark and contrast setup.
+from physics_steering_vectors.data import load_physics_splits  # Local: load benchmark rows. Global: benchmark setup.
 from physics_steering_vectors.evaluation import evaluate  # Local: score condition. Global: baseline/intervention measurement.
 from physics_steering_vectors.modeling import load_qwen35_bundle  # Local: model setup. Global: shared runtime.
 from physics_steering_vectors.reporting import print_result_table  # Local: output table. Global: final comparison.

@@ -176,7 +176,8 @@ baseline accuracy vs steered accuracy
 - Training positives: model-generated responses whose extracted answer matches the validation gold answer.
 - Training negatives: model-generated responses whose extracted answer differs from the validation gold answer.
 - Training sampling: controlled by `train_generations_per_question`, `train_temperature`, and `train_top_p`.
-- Shared generation: `generation.py` owns model completion for both training mining and evaluation.
+- Activation collection: `activation_collection.py` mines and pairs generated validation responses for vector training.
+- Shared generation: `generation.py` owns model completion for both activation collection and evaluation.
 
 The model choice follows the "strict latest Qwen3.5 small model" direction. Because this checkpoint
 is exposed through a multimodal image-text model class, the code uses `AutoProcessor` and
@@ -186,12 +187,14 @@ is exposed through a multimodal image-text model class, the code uses `AutoProce
 
 ```text
 .
+├── AGENTS.md
 ├── pyproject.toml
 ├── README.md
 └── src
     └── physics_steering_vectors
         ├── __init__.py
         ├── __main__.py
+        ├── activation_collection.py
         ├── answer_extraction.py
         ├── config.py
         ├── data.py
@@ -226,6 +229,7 @@ Key dependencies:
 - `requests`: fetch the official MMLU-Pro prompt template.
 - `tqdm`: progress bars.
 - `accelerate`: model device placement through `device_map="auto"`.
+- `pytest`: unit test runner for deterministic logic.
 
 ### `src/physics_steering_vectors/config.py`
 
@@ -296,16 +300,17 @@ Local function:
 - Tokenizes prompts, runs model generation, optionally applies steering hooks, and decodes only newly generated tokens.
 
 Global role:
-- Provides the single completion path used by both training-response mining and benchmark evaluation.
+- Provides the single completion path used by both activation collection and benchmark evaluation.
 
-### `src/physics_steering_vectors/data.py`
+### `src/physics_steering_vectors/activation_collection.py`
 
 Local function:
-- Loads MMLU-Pro, filters Physics rows, formats prompts, fetches the official prompt template, and
-  mines generated training responses, and builds positive/negative contrast pairs.
+- Mines sampled unsteered validation responses, classifies them by extracted answer correctness,
+  and pairs correct/incorrect generated responses for vector training.
 
 Global role:
-- Defines both the activation-training data and the held-out evaluation prompts.
+- Owns the activation-training contrast data while reusing prompt formatting from `data.py` and
+  model completion from `generation.py`.
 
 Positive examples:
 - Unsteered model-generated validation responses whose extracted answer matches the gold answer.
@@ -315,6 +320,14 @@ Negative examples:
 
 Unparsable responses:
 - Generated responses with no extractable answer are skipped and are not used for vector training.
+
+### `src/physics_steering_vectors/data.py`
+
+Local function:
+- Loads MMLU-Pro, filters Physics rows, formats prompts, and fetches the official prompt template.
+
+Global role:
+- Defines benchmark rows and prompt text shared by activation collection and held-out evaluation.
 
 ### `src/physics_steering_vectors/answer_extraction.py`
 
@@ -435,8 +448,9 @@ Keep the experiment modular:
 
 - Put protocol constants in `config.py`.
 - Put data and prompt formatting in `data.py`.
+- Put generated-response mining and positive/negative pair assembly in `activation_collection.py`.
 - Put model loading in `modeling.py`.
-- Put shared model completion logic in `generation.py`; do not duplicate generation code in training or evaluation modules.
+- Put shared model completion logic in `generation.py`; do not duplicate generation code in activation collection or evaluation modules.
 - Put intervention training in `steering.py`.
 - Put benchmark scoring in `evaluation.py`.
 - Keep `main.py` as simple phase orchestration.
