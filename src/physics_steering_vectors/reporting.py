@@ -29,6 +29,7 @@ def print_result_table(results: list[EvaluationResult]) -> None:
     """
 
     baseline_accuracy = results[0].accuracy if results else 0.0  # Local: identify control accuracy. Global: compute intervention deltas.
+    columns = ["label", "correct", "total", "accuracy", "delta_vs_baseline"]
     rows = [  # Local: flatten dataclasses. Global: prepare comparison table.
         {
             "label": result.label,
@@ -39,5 +40,7 @@ def print_result_table(results: list[EvaluationResult]) -> None:
         }
         for result in results
     ]
-    frame = pd.DataFrame(rows).sort_values("accuracy", ascending=False)  # Source: pandas DataFrame docs. Local: create/sort table. Global: rank interventions.
+    frame = pd.DataFrame(rows, columns=columns)  # Source: pandas DataFrame docs. Local: create table. Global: stable report shape.
+    if rows:
+        frame = frame.sort_values("accuracy", ascending=False)  # Local: sort populated table. Global: rank interventions.
     print(frame.to_string(index=False))  # Local: print full table. Global: final research readout.
