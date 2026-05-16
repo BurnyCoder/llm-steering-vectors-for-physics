@@ -1,0 +1,151 @@
+\documentclass{article}
+\usepackage{amsmath,amssymb}
+\usepackage{url}
+
+\title{LLM Steering Vectors for Physics}
+\author{Libor Burian (Burny)}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This paper tests whether activation steering improves a small Qwen language model on MMLU-Pro Physics questions. Correct and incorrect unsteered validation generations are mined, paired, and used to train layer-specific steering vectors from final-token activations. Each steering vector is computed as a mean activation difference, then applied by adding it to a selected model layer with a chosen scaling factor. Steered held-out test accuracy is compared with an unsteered baseline.
+\end{abstract}
+
+\section{Mathematical Formulation}
+
+What follows is mathematization of steering vectors \cite{turner2023activation}.
+
+Let \(\mathbb N=\{1,2,\ldots\}\) and \(\mathbb N_0=\{0,1,2,\ldots\}\).
+Let an alphabet be a finite nonempty set of symbols.
+Let \(A^*\) denote the Kleene closure of an alphabet \(A\).
+Let \(\Delta(E)\) be the set of probability distributions over a finite or countable set \(E\).
+Let \(\Theta\) be the model-parameter space.
+
+Let \(\Sigma_{\mathrm{text}}\) be a text alphabet and \(\Sigma_{\mathrm{tok}}\) be a token alphabet.
+Let \(\mathcal S=\Sigma_{\mathrm{text}}^*\) be the set of finite text strings and \(\mathcal X=\Sigma_{\mathrm{tok}}^*\) be the set of finite token strings.
+Let \(\operatorname{tok}:\mathcal S\to\mathcal X\) be the tokenizer.
+Let \(\operatorname{detok}:\mathcal X\to\mathcal S\) be the detokenizer, with \(\operatorname{detok}(\operatorname{tok}(s))=s\) for all \(s\in\mathcal S\), so \(\operatorname{detok}\) is the inverse of \(\operatorname{tok}\) on \(\operatorname{tok}(\mathcal S)\).
+Let \(\mathcal Y=\{\eta_1,\ldots,\eta_R\}\) be a finite answer-label alphabet of size \(R\in\mathbb N\).
+
+Let \(V\in\mathbb N\) be the number of sampled completions per validation prompt, \(T\in\mathbb R_{>0}\) be temperature, and \(q\in(0,1]\) be the nucleus sampling threshold.
+Let \(\theta\in\Theta\), and let \(P_\theta:\mathcal X\to\Delta(\Sigma_{\mathrm{tok}})\) be the next-token conditional distribution map of the unsteered autoregressive model.
+Let the token-completion and text-completion conditional distribution maps be
+
+\[
+M_\theta^{\mathrm{tok}}:\mathcal X\times\mathbb R_{>0}\times(0,1]\to\Delta(\mathcal X),
+\qquad
+M_\theta:\mathcal S\times\mathbb R_{>0}\times(0,1]\to\Delta(\mathcal S).
+\]
+
+For \(z\in\mathcal X\), let \(M_\theta^{\mathrm{tok}}(\cdot\mid z;T,q)\) be the induced distribution on token-string completions in \(\mathcal X\).
+For \(s\in\mathcal S\) and \(B\subseteq\mathcal S\), define the decoded text-completion distribution by
+
+\[
+M_\theta(B\mid s;T,q)
+=M_\theta^{\mathrm{tok}}(\{x\in\mathcal X:\operatorname{detok}(x)\in B\}\mid \operatorname{tok}(s);T,q).
+\]
+
+Let \(u\in\mathbb N\) be the number of validation rows and \(I=\{1,\ldots,u\}\) be the validation index set.
+Let \(i\in I\) index validation rows, \(p_i\in\mathcal S\) be validation prompt \(i\), and \(a_i\in\mathcal Y\) be the gold validation answer.
+Let \(K=\{1,\ldots,V\}\) be the sampled-completion index set, and let \(k\) index sampled completions in \(K\).
+Let \(g_{ik}\in\mathcal S\) be sampled by
+
+\[
+g_{ik} \sim M_\theta(\cdot \mid p_i; T, q).
+\]
+
+Let \(\hat a:\mathcal S\to\mathcal Y\cup\{\varnothing\}\) be answer extraction, \(\varnothing\) be no extracted answer, and \(\Vert:\mathcal S\times\mathcal S\to\mathcal S\) be string concatenation.
+Let \(P,N\subseteq\mathcal S\) be correct text and incorrect parseable text:
+
+\[
+\begin{aligned}
+P={}&\{p_i \Vert g_{ik}:(i,k)\in I\times K,\\
+&\hspace{2.4cm}\hat a(g_{ik})=a_i\},\\
+N={}&\{p_i \Vert g_{ik}:(i,k)\in I\times K,\\
+&\hspace{2.4cm}\hat a(g_{ik})\ne a_i,\ \hat a(g_{ik})\ne\varnothing\}.
+\end{aligned}
+\]
+
+Let \(|\cdot|\) be cardinality.
+Let \(n=\min(|P|,|N|)\in\mathbb N\) be the pair count.
+Let \(P^\pi=(p^\pi_1,\ldots,p^\pi_{|P|})\in\mathcal S^{|P|}\) and \(N^\rho=(n^\rho_1,\ldots,n^\rho_{|N|})\in\mathcal S^{|N|}\) be random shuffles of \(P\) and \(N\).
+Let \(j\in\{1,\ldots,n\}\) index pairs and \(D\in(\mathcal S\times\mathcal S)^n\) be the paired contrast sequence:
+
+\[
+D=\bigl((p^\pi_1,n^\rho_1),\ldots,(p^\pi_n,n^\rho_n)\bigr).
+\]
+
+Let \(\mathcal L\subset\mathbb N_0\) be the steered decoder layers.
+Let \(\ell\in\mathcal L\) be a decoder layer and \(t\in\mathbb N_0\) be a token position.
+Let \(d\in\mathbb N\) be the activation dimension, \(x\in\mathcal S\) be text, \(\tau:\mathcal S\to\mathbb N_0\) be the read-token map on \(\operatorname{tok}(x)\), \(h_{\ell,t}(x)\in\mathbb R^d\) be the decoder-block activation on \(\operatorname{tok}(x)\), and \(v_\ell\in\mathbb R^d\) be the steering vector:
+
+\[
+\begin{aligned}
+\tau(x)&=\text{last non-padding position of }\operatorname{tok}(x),\\
+v_\ell&=\frac1n\sum_{j=1}^{n}
+\Bigl(h_{\ell,\tau(p^\pi_j)}(p^\pi_j)
+-h_{\ell,\tau(n^\rho_j)}(n^\rho_j)\Bigr).
+\end{aligned}
+\]
+
+Let \(\mathcal A\subset\mathbb R_{>0}\) be the set of scaling multipliers, and let \(\alpha\in\mathcal A\) be a multiplier.
+Let \(b\) be an unsteered baseline symbol with \(b\notin\mathcal L\times\mathcal A\).
+Let \(\mathcal C=\{b\}\cup(\mathcal L\times\mathcal A)\) be the condition set and \(c\in\mathcal C\) be a condition.
+Let \(\lambda\in\mathbb N_0\) index decoder layers and \(h_{\lambda,t}^{(c)}(x)\in\mathbb R^d\) be the condition-specific activation:
+
+\[
+\begin{aligned}
+h_{\lambda,t}^{(b)}(x)&=h_{\lambda,t}(x),\\
+h_{\lambda,t}^{(\ell,\alpha)}(x)&=
+\begin{cases}
+h_{\ell,t}(x)+\alpha v_\ell, & \lambda=\ell,\\
+h_{\lambda,t}(x), & \lambda\ne\ell.
+\end{cases}
+\end{aligned}
+\]
+
+Let \(M_\theta^{(c)}\) be \(M_\theta\) run with activations \(h_{\lambda,t}^{(c)}\), and write \(M_\theta^{(c)}(s)\) for its generated text completion on \(s\in\mathcal S\).
+Let \(m\in\mathbb N\) be the number of test rows.
+Let \(r\in\{1,\ldots,m\}\) index test rows, \(s_r\in\mathcal S\) be the \(r\)-th test prompt, \(a_r\in\mathcal Y\) be the \(r\)-th gold test answer, and \(y_r^{(c)}\in\mathcal S\) be the evaluation completion:
+
+\[
+y_r^{(c)}=M_\theta^{(c)}(s_r).
+\]
+
+Let \(\mathbf 1[E]\in\{0,1\}\) be \(1\) if event \(E\) is true and \(0\) otherwise, \(\operatorname{Acc}:\mathcal C\to[0,1]\) be accuracy, and \(\Delta_{\ell,\alpha}\in[-1,1]\) be accuracy delta versus baseline:
+
+\[
+\operatorname{Acc}(c)=\frac1m\sum_{r=1}^{m}\mathbf 1[\hat a(y_r^{(c)})=a_r],
+\qquad
+\Delta_{\ell,\alpha}=\operatorname{Acc}(\ell,\alpha)-\operatorname{Acc}(b).
+\]
+
+\subsection*{Paper's Codebase Uses}
+
+Paper's codebase uses \(M_\theta=\text{Qwen3.5-0.8B}\), a Qwen3.5 autoregressive transformer.
+It sets
+
+\[
+V=4,\quad
+T=0.8,\quad
+q=0.95,
+\]
+
+\[
+\mathcal L=\{6,12,18\},\quad
+\mathcal A=\{0.5,1.0,1.5,2.0\}.
+\]
+
+\begin{thebibliography}{1}
+
+\bibitem{turner2023activation}
+Alexander Matt Turner, Lisa Thiergart, Gavin Leech, David Udell, Juan J. Vazquez, Ulisse Mini, and Monte MacDiarmid.
+\emph{Steering Language Models With Activation Engineering}.
+arXiv:2308.10248, 2023.
+\url{https://arxiv.org/abs/2308.10248}.
+
+\end{thebibliography}
+
+\end{document}
