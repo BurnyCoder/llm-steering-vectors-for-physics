@@ -43,6 +43,9 @@ class ExperimentConfig:
     fewshot_k: int = 5  # Local: number of validation examples in prompt. Global: matches official MMLU-Pro CoT style.
     max_new_tokens: int = 512  # Local: cap generation length. Global: limits runaway small-model CoT loops.
     max_test_examples: int | None = None  # Local: optional smoke-test cap. Global: full benchmark when None.
+    train_generations_per_question: int = 4  # Local: sampled attempts per validation row. Global: mine real correct/incorrect response pools.
+    train_temperature: float = 0.8  # Local: diversify training generations. Global: improve odds of mixed correct/incorrect responses.
+    train_top_p: float = 0.95  # Local: nucleus sampling for training generations. Global: keep sampled mining bounded but varied.
 
     layer_sweep: tuple[int, ...] = (6, 12, 18)  # Local: layers to train vectors on. Global: tests intervention location.
     multipliers: tuple[float, ...] = (0.5, 1.0, 1.5, 2.0)  # Local: steering strengths. Global: tests dose response.

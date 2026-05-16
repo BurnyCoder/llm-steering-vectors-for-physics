@@ -6,6 +6,7 @@ dependencies = [
   "accelerate>=1.7",
   "datasets>=3.6",
   "pandas>=2.2",
+  "pytest>=8.4",
   "requests>=2.32",
   "steering-vectors>=0.12.1",
   "torch>=2.6",
@@ -15,6 +16,9 @@ dependencies = [
 
 [project.scripts]
 physics-steering = "physics_steering_vectors.main:main"
+
+[tool.uv]
+environments = ["sys_platform == 'linux'"]
 
 [build-system]
 requires = ["hatchling"]

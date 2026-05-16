@@ -42,7 +42,7 @@ def main() -> None:
 
     model_bundle = phase_1_model_setup(config)  # Local: load Qwen3.5 and hooks. Global: create model to steer and evaluate.
     benchmark_splits = phase_2_benchmark_setup(config)  # Local: load Physics rows. Global: define validation/test data.
-    training_pairs = phase_3_contrast_pair_setup(benchmark_splits)  # Local: make contrast pairs. Global: define steering signal.
+    training_pairs = phase_3_contrast_pair_setup(config, model_bundle, benchmark_splits)  # Local: mine contrast pairs. Global: define steering signal.
 
     baseline = phase_4_baseline_evaluation(config, model_bundle, benchmark_splits)  # Local: score unsteered model. Global: control condition.
     steered_results = phase_5_steering_sweep(  # Local: train/apply vectors. Global: experimental interventions.

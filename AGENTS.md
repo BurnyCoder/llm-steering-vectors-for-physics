@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This is a Python 3.11 research package using a `src` layout. Runtime code lives in `src/physics_steering_vectors/`. The entry points are `main.py` for the experiment protocol and `__main__.py` for `python -m physics_steering_vectors`. Configuration is centralized in `config.py`; phase orchestration is in `phases.py`; domain logic is split across `data.py`, `modeling.py`, `steering.py`, `evaluation.py`, `answer_extraction.py`, `layers.py`, and `reporting.py`. Shared dataclasses live in `schemas.py`. There is no committed test suite yet; add tests under `tests/` using names like `tests/test_answer_extraction.py`.
+This is a Python 3.11 research package using a `src` layout. Runtime code lives in `src/physics_steering_vectors/`. The entry points are `main.py` for the experiment protocol and `__main__.py` for `python -m physics_steering_vectors`. Configuration is centralized in `config.py`; phase orchestration is in `phases.py`; shared model completion is in `generation.py`; domain logic is split across `data.py`, `modeling.py`, `steering.py`, `evaluation.py`, `answer_extraction.py`, `layers.py`, and `reporting.py`. Shared dataclasses live in `schemas.py`. There is no committed test suite yet; add tests under `tests/` using names like `tests/test_answer_extraction.py`.
 
 ## Build, Test, and Development Commands
 
@@ -21,11 +21,11 @@ uv run physics-steering
 uv run python -m physics_steering_vectors
 ```
 
-For a quick smoke run, temporarily set `max_test_examples` in `src/physics_steering_vectors/config.py` to a small value such as `25`, then run `uv run physics-steering`. Restore it to `None` before benchmark-quality runs.
+For a quick smoke run, temporarily set `max_test_examples` to a small value such as `25` and consider lowering `train_generations_per_question` in `src/physics_steering_vectors/config.py`, then run `uv run physics-steering`. Restore protocol-affecting settings before benchmark-quality runs.
 
 ## Coding Style & Naming Conventions
 
-Follow the existing Python style: four-space indentation, type hints, dataclasses for structured records, and small modules with explicit phase boundaries. Use `snake_case` for functions, variables, and modules; use `PascalCase` for dataclasses. Keep experiment constants in `ExperimentConfig` rather than scattering literals across modules. Avoid introducing `pip`, `conda`, or ad hoc environment files; dependencies belong in `pyproject.toml`.
+Follow the existing Python style: four-space indentation, type hints, dataclasses for structured records, and small modules with explicit phase boundaries. Use `snake_case` for functions, variables, and modules; use `PascalCase` for dataclasses. Keep experiment constants in `ExperimentConfig` rather than scattering literals across modules. Keep model completion code centralized in `generation.py`; training-response mining and evaluation should call the shared helper rather than duplicating tokenizer/generate/decode logic. Training contrast pairs should come from actual model-generated validation responses classified by extracted answer correctness. Do not recreate the old rule-based negative path by editing only final answer letters. Avoid introducing `pip`, `conda`, or ad hoc environment files; dependencies belong in `pyproject.toml`.
 
 ## Testing Guidelines
 
@@ -43,4 +43,4 @@ The current history only contains `Initial project`, so no detailed commit conve
 
 ## Security & Configuration Tips
 
-Do not commit downloaded models, datasets, generated caches, or virtual environments. Keep local secrets and Hugging Face credentials outside the repository. Treat `max_test_examples`, model IDs, layer sweeps, and multipliers as protocol-affecting settings and document any changes in PRs.
+Do not commit downloaded models, datasets, generated caches, or virtual environments. Keep local secrets and Hugging Face credentials outside the repository. Treat `max_test_examples`, `train_generations_per_question`, training sampling settings, model IDs, layer sweeps, and multipliers as protocol-affecting settings and document any changes in PRs.

@@ -62,20 +62,24 @@ def phase_2_benchmark_setup(config: ExperimentConfig) -> BenchmarkSplits:
     return splits  # Local: return prepared data. Global: pass to contrast/eval phases.
 
 
-def phase_3_contrast_pair_setup(splits: BenchmarkSplits) -> list[tuple[str, str]]:
+def phase_3_contrast_pair_setup(
+    config: ExperimentConfig,
+    bundle: ModelBundle,
+    splits: BenchmarkSplits,
+) -> list[tuple[str, str]]:
     """Phase 3: contrast-pair setup.
 
     Sources Used:
     - steering-vectors basic usage: https://steering-vectors.github.io/steering-vectors/basic_usage.html
 
     Local Function:
-    - Build positive/negative prompt tuples from validation rows.
+    - Mine positive/negative model-generated response tuples from validation rows.
 
     Global Role:
     - Defines the activation direction as accurate physics solution minus inaccurate solution.
     """
 
-    training_pairs = build_training_pairs(splits.validation)  # Local: create tuples. Global: input to steering-vector training.
+    training_pairs = build_training_pairs(config, bundle, splits.validation)  # Local: mine tuples. Global: input to steering-vector training.
     print(f"Training contrast pairs: {len(training_pairs)}")  # Local: show count. Global: audit vector training signal.
     return training_pairs  # Local: return pairs. Global: pass to steering sweep.
 

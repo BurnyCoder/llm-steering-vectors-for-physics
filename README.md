@@ -3,9 +3,10 @@
 This repository is a research project for testing whether activation steering can improve
 small Qwen model performance on physics questions.
 
-The experiment uses `Qwen/Qwen3.5-0.8B`, builds steering vectors from accurate versus inaccurate
-MMLU-Pro Physics solutions, applies those vectors during generation, and compares benchmark
-accuracy against an unsteered baseline.
+The experiment uses `Qwen/Qwen3.5-0.8B`, mines correct and incorrect model-generated
+MMLU-Pro Physics responses from validation rows, trains steering vectors from those generated
+responses, applies the vectors during generation, and compares benchmark accuracy against an
+unsteered baseline.
 
 ## Research Goal
 
@@ -19,11 +20,12 @@ The experiment is structured as a controlled comparison:
 
 1. Load the selected Qwen model.
 2. Load MMLU-Pro Physics validation and test rows.
-3. Build positive/negative contrast pairs from validation rows only. TODO: Generate answers using Qwen
-4. Train steering vectors from those contrast pairs.
-5. Evaluate the unsteered model on held-out test rows.
-6. Evaluate steered generations across a layer and multiplier sweep.
-7. Report accuracy and delta from baseline.
+3. Generate sampled unsteered model responses for validation rows.
+4. Classify generated responses as positive when the extracted answer is correct and negative when it is incorrect.
+5. Train steering vectors from those generated-response contrast pairs.
+6. Evaluate the unsteered model on held-out test rows.
+7. Evaluate steered generations across a layer and multiplier sweep.
+8. Report accuracy and delta from baseline.
 
 The validation split is used to create steering vectors. The test split is reserved for evaluation.
 That separation is important because it avoids directly training the steering vector on the same
@@ -108,9 +110,10 @@ The script prints:
 1. The inferred decoder hook template.
 2. Number of validation Physics rows.
 3. Number of test Physics rows.
-4. Number of training contrast pairs.
-5. Progress bars for baseline and steered evaluations.
-6. A final table like:
+4. A progress bar while mining generated validation responses.
+5. Counts for mined positive responses, negative responses, unparsable responses, and usable training pairs.
+6. Progress bars for baseline and steered evaluations.
+7. A final table like:
 
 ```text
               label  correct  total  accuracy  delta_vs_baseline
@@ -140,7 +143,13 @@ are stable or isolated.
 MMLU-Pro validation physics rows
         |
         v
-correct CoT solutions + wrong-final-answer variants
+sampled unsteered Qwen3.5 responses
+        |
+        v
+answer extraction and correct/incorrect classification
+        |
+        v
+generated positive/negative response pairs
         |
         v
 steering-vectors train_steering_vector()
@@ -164,6 +173,10 @@ baseline accuracy vs steered accuracy
 - Model loading: Hugging Face `transformers`
 - Dataset loading: Hugging Face `datasets`
 - Python package management: `uv`
+- Training positives: model-generated responses whose extracted answer matches the validation gold answer.
+- Training negatives: model-generated responses whose extracted answer differs from the validation gold answer.
+- Training sampling: controlled by `train_generations_per_question`, `train_temperature`, and `train_top_p`.
+- Shared generation: `generation.py` owns model completion for both training mining and evaluation.
 
 The model choice follows the "strict latest Qwen3.5 small model" direction. Because this checkpoint
 is exposed through a multimodal image-text model class, the code uses `AutoProcessor` and
@@ -183,6 +196,7 @@ is exposed through a multimodal image-text model class, the code uses `AutoProce
         ├── config.py
         ├── data.py
         ├── evaluation.py
+        ├── generation.py
         ├── layers.py
         ├── main.py
         ├── modeling.py
@@ -228,6 +242,9 @@ Important fields:
 - `layer_sweep`: decoder layers where vectors are trained.
 - `multipliers`: steering strengths tested at generation time.
 - `max_test_examples`: optional cap for smoke tests.
+- `train_generations_per_question`: sampled unsteered completions to mine per validation row.
+- `train_temperature`: sampling temperature used only while mining training responses.
+- `train_top_p`: nucleus sampling value used only while mining training responses.
 
 ### `src/physics_steering_vectors/schemas.py`
 
@@ -273,28 +290,31 @@ Local function:
 Global role:
 - Produces the model runtime shared by vector training and benchmark evaluation.
 
+### `src/physics_steering_vectors/generation.py`
+
+Local function:
+- Tokenizes prompts, runs model generation, optionally applies steering hooks, and decodes only newly generated tokens.
+
+Global role:
+- Provides the single completion path used by both training-response mining and benchmark evaluation.
+
 ### `src/physics_steering_vectors/data.py`
 
 Local function:
 - Loads MMLU-Pro, filters Physics rows, formats prompts, fetches the official prompt template, and
-  builds positive/negative contrast pairs.
+  mines generated training responses, and builds positive/negative contrast pairs.
 
 Global role:
 - Defines both the activation-training data and the held-out evaluation prompts.
 
 Positive examples:
-- Correct MMLU-Pro chain-of-thought solution text from validation rows.
+- Unsteered model-generated validation responses whose extracted answer matches the gold answer.
 
 Negative examples:
-- The same question and solution text, but with the final answer changed to an incorrect option.
+- Unsteered model-generated validation responses whose extracted answer differs from the gold answer.
 
-This creates a deliberately narrow contrast:
-
-```text
-accurate final-answer physics solution
-minus
-inaccurate final-answer physics solution
-```
+Unparsable responses:
+- Generated responses with no extractable answer are skipped and are not used for vector training.
 
 ### `src/physics_steering_vectors/answer_extraction.py`
 
@@ -320,7 +340,7 @@ from each positive/negative prompt pair.
 ### `src/physics_steering_vectors/evaluation.py`
 
 Local function:
-- Generates completions with or without steering, extracts answer letters, and scores each row.
+- Builds evaluation prompts, calls the shared generation helper with or without steering, extracts answer letters, and scores each row.
 
 Global role:
 - Measures whether the steering intervention improves held-out MMLU-Pro Physics accuracy.
@@ -371,7 +391,7 @@ config = ExperimentConfig()
 
 model_bundle = phase_1_model_setup(config)
 benchmark_splits = phase_2_benchmark_setup(config)
-training_pairs = phase_3_contrast_pair_setup(benchmark_splits)
+training_pairs = phase_3_contrast_pair_setup(config, model_bundle, benchmark_splits)
 
 baseline = phase_4_baseline_evaluation(config, model_bundle, benchmark_splits)
 steered_results = phase_5_steering_sweep(
@@ -416,6 +436,7 @@ Keep the experiment modular:
 - Put protocol constants in `config.py`.
 - Put data and prompt formatting in `data.py`.
 - Put model loading in `modeling.py`.
+- Put shared model completion logic in `generation.py`; do not duplicate generation code in training or evaluation modules.
 - Put intervention training in `steering.py`.
 - Put benchmark scoring in `evaluation.py`.
 - Keep `main.py` as simple phase orchestration.
