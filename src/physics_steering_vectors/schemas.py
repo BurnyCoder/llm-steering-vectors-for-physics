@@ -20,18 +20,18 @@ class ModelBundle:
     """Loaded model assets.
 
     Sources Used:
-    - Qwen3.5 model card: https://huggingface.co/Qwen/Qwen3.5-0.8B
+    - Qwen2.5 model card: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
     - train_steering_vector API: https://steering-vectors.github.io/steering-vectors/api/train_steering_vector.html
 
     Local Function:
-    - Groups model, processor, tokenizer, and steering hook config.
+    - Groups model, optional processor, tokenizer, and steering hook config.
 
     Global Role:
     - Provides every later phase with the same loaded model runtime.
     """
 
     model: Any  # Local: HF model object. Global: used for activation extraction and generation.
-    processor: Any  # Local: Qwen processor. Global: keeps full model preprocessing available if needed.
+    processor: Any | None  # Local: optional Qwen processor. Global: keeps bundle compatible with multimodal/text loaders.
     tokenizer: Any  # Local: text tokenizer. Global: converts prompts for steering training and evaluation.
     layer_config: dict[str, str]  # Local: steering hook path template. Global: maps vector layers to Qwen modules.
 

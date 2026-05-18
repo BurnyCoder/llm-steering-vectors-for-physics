@@ -43,7 +43,7 @@ def train_vector_for_layer(
         training_pairs,  # Local: positive/negative strings. Global: accurate-minus-inaccurate physics direction.
         layers=[layer],  # Local: train only selected layer. Global: supports layer sweep.
         layer_type="decoder_block",  # Source: steering-vectors API default layer type. Local: hook decoder blocks. Global: steer residual stream at blocks.
-        layer_config=bundle.layer_config,  # Local: Qwen module path template. Global: bridge Qwen3.5 to steering-vectors.
+        layer_config=bundle.layer_config,  # Local: Qwen module path template. Global: bridge Qwen to steering-vectors.
         read_token_index=-1,  # Source: train_steering_vector API. Local: read final token activation. Global: capture solution-level representation.
         batch_size=config.train_batch_size,  # Local: memory-aware batch size. Global: keeps experiment runnable.
         show_progress=True,  # Local: show training progress. Global: long runs remain observable.

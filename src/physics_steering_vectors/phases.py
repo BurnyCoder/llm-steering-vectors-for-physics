@@ -1,7 +1,7 @@
 """Readable experiment phases.
 
 Sources Used:
-- Qwen3.5 model card: https://huggingface.co/Qwen/Qwen3.5-0.8B
+- Qwen2.5 model card: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
 - MMLU-Pro official repo: https://github.com/TIGER-AI-Lab/MMLU-Pro
 - steering-vectors docs: https://steering-vectors.github.io/steering-vectors/basic_usage.html
 
@@ -16,7 +16,7 @@ from physics_steering_vectors.activation_collection import build_training_pairs 
 from physics_steering_vectors.config import ExperimentConfig  # Local: phase settings. Global: single protocol object.
 from physics_steering_vectors.data import load_physics_splits  # Local: load benchmark rows. Global: benchmark setup.
 from physics_steering_vectors.evaluation import evaluate  # Local: score condition. Global: baseline/intervention measurement.
-from physics_steering_vectors.modeling import load_qwen35_bundle  # Local: model setup. Global: shared runtime.
+from physics_steering_vectors.modeling import load_qwen_bundle  # Local: model setup. Global: shared runtime.
 from physics_steering_vectors.reporting import print_result_table  # Local: output table. Global: final comparison.
 from physics_steering_vectors.reproducibility import set_reproducibility  # Local: seed setup. Global: repeatability.
 from physics_steering_vectors.schemas import BenchmarkSplits, EvaluationResult, ModelBundle  # Local: typed phase boundaries. Global: readable pipeline.
@@ -27,18 +27,18 @@ def phase_1_model_setup(config: ExperimentConfig) -> ModelBundle:
     """Phase 1: model setup.
 
     Sources Used:
-    - Qwen3.5 model card: https://huggingface.co/Qwen/Qwen3.5-0.8B
-    - Transformers Qwen3.5 docs: https://huggingface.co/docs/transformers/main/en/model_doc/qwen3_5
+    - Qwen2.5 model card: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
+    - Transformers Qwen2 docs: https://huggingface.co/docs/transformers/model_doc/qwen2
 
     Local Function:
-    - Seed RNGs, load Qwen3.5, infer decoder hook path.
+    - Seed RNGs, load Qwen, infer decoder hook path.
 
     Global Role:
     - Creates the model runtime that all later phases share.
     """
 
     set_reproducibility(config.seed)  # Local: seed process. Global: make comparisons repeatable.
-    bundle = load_qwen35_bundle(config)  # Local: load model/tokenizer/hooks. Global: prepare object to steer/evaluate.
+    bundle = load_qwen_bundle(config)  # Local: load model/tokenizer/hooks. Global: prepare object to steer/evaluate.
     print(f"Decoder hook template: {bundle.layer_config['decoder_block']}")  # Local: show hook path. Global: audit intervention target.
     return bundle  # Local: return model bundle. Global: pass to downstream phases.
 
@@ -96,7 +96,7 @@ def phase_4_baseline_evaluation(
     - MMLU-Pro official repo: https://github.com/TIGER-AI-Lab/MMLU-Pro
 
     Local Function:
-    - Evaluate unsteered Qwen3.5 on Physics test rows.
+    - Evaluate unsteered Qwen on Physics test rows.
 
     Global Role:
     - Provides the control condition for all steering deltas.

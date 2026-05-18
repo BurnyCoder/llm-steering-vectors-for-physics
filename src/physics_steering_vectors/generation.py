@@ -1,8 +1,8 @@
 """Shared model completion helpers.
 
 Sources Used:
-- Qwen3.5 model card: https://huggingface.co/Qwen/Qwen3.5-0.8B
-- Transformers Qwen3.5 docs: https://huggingface.co/docs/transformers/main/en/model_doc/qwen3_5
+- Qwen2.5 model card: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
+- Transformers Qwen2 docs: https://huggingface.co/docs/transformers/model_doc/qwen2
 - SteeringVector API: https://steering-vectors.github.io/steering-vectors/api/steering_vector.html
 
 Local Function:
@@ -36,7 +36,7 @@ def generate_completion(
     """Generate one completion with optional steering and decoding overrides.
 
     Sources Used:
-    - Qwen3.5 model card: https://huggingface.co/Qwen/Qwen3.5-0.8B
+    - Qwen2.5 model card: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
     - SteeringVector.apply docs: https://steering-vectors.github.io/steering-vectors/api/steering_vector.html
 
     Local Function:

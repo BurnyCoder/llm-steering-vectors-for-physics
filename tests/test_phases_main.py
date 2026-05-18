@@ -10,7 +10,7 @@ def test_phase_1_model_setup_seeds_loads_and_prints_hook(monkeypatch, capsys) ->
     calls: list[tuple[str, object]] = []
 
     monkeypatch.setattr(phases, "set_reproducibility", lambda seed: calls.append(("seed", seed)))
-    monkeypatch.setattr(phases, "load_qwen35_bundle", lambda config_arg: bundle)
+    monkeypatch.setattr(phases, "load_qwen_bundle", lambda config_arg: bundle)
 
     assert phases.phase_1_model_setup(config) is bundle
     assert calls == [("seed", 99)]

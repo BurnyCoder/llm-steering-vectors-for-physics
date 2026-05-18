@@ -1,7 +1,7 @@
 """Experiment configuration.
 
 Sources Used:
-- Qwen3.5 model card: https://huggingface.co/Qwen/Qwen3.5-0.8B
+- Qwen2.5 model card: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
 - MMLU-Pro dataset card: https://huggingface.co/datasets/TIGER-Lab/MMLU-Pro
 - steering-vectors basic usage: https://steering-vectors.github.io/steering-vectors/basic_usage.html
 
@@ -20,7 +20,7 @@ class ExperimentConfig:
     """Settings for the full steering-vector experiment.
 
     Sources Used:
-    - Qwen3.5 model card: https://huggingface.co/Qwen/Qwen3.5-0.8B
+    - Qwen2.5 model card: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
     - MMLU-Pro official repo: https://github.com/TIGER-AI-Lab/MMLU-Pro
     - train_steering_vector API: https://steering-vectors.github.io/steering-vectors/api/train_steering_vector.html
 
@@ -31,7 +31,7 @@ class ExperimentConfig:
     - Defines exactly what research experiment is being run.
     """
 
-    model_id: str = "Qwen/Qwen3.5-0.8B"  # Local: choose strict-latest small Qwen. Global: model under intervention.
+    model_id: str = "Qwen/Qwen2.5-0.5B-Instruct"  # Local: choose smallest compatible older Qwen. Global: model under intervention.
     dataset_id: str = "TIGER-Lab/MMLU-Pro"  # Local: choose benchmark dataset. Global: source of train/eval physics rows.
     subject: str = "physics"  # Local: filter MMLU-Pro category. Global: restricts experiment to physics performance.
     initial_prompt_url: str = (  # Local: official MMLU-Pro prompt source. Global: keeps evaluation prompt close to benchmark repo.

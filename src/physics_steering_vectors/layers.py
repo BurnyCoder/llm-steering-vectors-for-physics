@@ -1,14 +1,14 @@
-"""Layer-hook discovery for Qwen3.5.
+"""Layer-hook discovery for Qwen models.
 
 Sources Used:
 - train_steering_vector API: https://steering-vectors.github.io/steering-vectors/api/train_steering_vector.html
-- Transformers Qwen3.5 docs: https://huggingface.co/docs/transformers/main/en/model_doc/qwen3_5
+- Transformers Qwen2 docs: https://huggingface.co/docs/transformers/model_doc/qwen2
 
 Local Function:
 - Finds the decoder block module path template expected by steering-vectors.
 
 Global Role:
-- Connects Qwen3.5 internals to the activation-hook library.
+- Connects Qwen internals to the activation-hook library.
 """
 
 from torch import nn  # Local: type model modules. Global: accepts any HF model exposing named_modules.
@@ -19,10 +19,10 @@ def infer_decoder_block_template(model: nn.Module) -> str:
 
     Sources Used:
     - train_steering_vector API: https://steering-vectors.github.io/steering-vectors/api/train_steering_vector.html
-    - Transformers Qwen3.5 docs: https://huggingface.co/docs/transformers/main/en/model_doc/qwen3_5
+    - Transformers Qwen2 docs: https://huggingface.co/docs/transformers/model_doc/qwen2
 
     Local Function:
-    - Searches likely Qwen3.5 module names for layer zero.
+    - Searches likely Qwen module names for layer zero.
 
     Global Role:
     - Produces the `layer_config` needed to record and patch activations.
@@ -35,7 +35,7 @@ def infer_decoder_block_template(model: nn.Module) -> str:
         "model.language_model.model.layers.{num}",  # Local: possible double-wrapped path. Global: robust to HF architecture wrappers.
         "language_model.layers.{num}",  # Local: possible direct language model path. Global: robust to alternate class layout.
         "language_model.model.layers.{num}",  # Local: possible nested direct path. Global: handles tokenizer/model wrappers.
-        "model.layers.{num}",  # Local: common decoder-only path. Global: works if Qwen3.5 loads as causal LM-like module.
+        "model.layers.{num}",  # Local: common decoder-only path. Global: works for Qwen2-style causal LM modules.
     ]
 
     for template in candidates:  # Local: test templates in priority order. Global: choose a hook path automatically.
