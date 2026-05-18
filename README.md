@@ -1,6 +1,6 @@
 # LLM Steering Vectors for Physics
 
-This repository is a research project for testing whether activation steering can improve small Qwen LLM model performance on physics questions.
+This repository is a Python 3.14 research package for testing whether activation steering can improve small Qwen LLM model performance on physics questions.
 
 The experiment uses Qwen LLM, mines correct and incorrect model-generated MMLU-Pro Physics responses from validation rows, trains steering vectors from those generated
 responses, applies the vectors during generation, and compares benchmark accuracy against an unsteered baseline.
@@ -28,7 +28,8 @@ The validation split is used to create steering vectors. The test split is reser
 
 ## Setup With `uv`
 
-This repo is intended to use `uv` for all Python package management.
+This repo is intended to use `uv` for all Python package management. The project requires Python
+`>=3.14,<3.15`, and `.python-version` currently pins local development to Python `3.14.2`.
 
 Do not use `pip`, `pip3`, or `conda` for this project.
 
@@ -50,15 +51,8 @@ source .venv/bin/activate
 uv sync
 ```
 
-This will install the dependencies declared in `pyproject.toml`.
-
-One dependency is installed from the current Hugging Face Transformers GitHub repository:
-
-```toml
-"transformers @ git+https://github.com/huggingface/transformers.git"
-```
-
-That is intentional because the selected Qwen3.5 model may require the newest Transformers support.
+This will install the dependencies declared in `pyproject.toml` and locked in `uv.lock`. The
+current dependency set uses released `transformers` versions constrained to `>=4.57.6,<5`.
 
 ## Running the Experiment
 
@@ -74,12 +68,24 @@ Equivalent module form:
 uv run python -m physics_steering_vectors
 ```
 
+## Tests
+
+The repository includes focused unit tests under `tests/` for deterministic logic and phase
+orchestration. The tests mock model, tokenizer, dataset, and steering-library calls where needed so
+they do not require GPU access or Hugging Face downloads.
+
+Run the test suite with:
+
+```bash
+uv run pytest
+```
+
 ## Smoke Test
 
 The full run may take a while because it loads the model, trains several steering vectors, and
 evaluates multiple conditions.
 
-For a quick smoke test, temporarily set this field in
+For a quick experiment smoke test, temporarily set this field in
 `src/physics_steering_vectors/config.py`:
 
 ```python
@@ -91,6 +97,9 @@ Then run:
 ```bash
 uv run physics-steering
 ```
+
+You can also lower `train_generations_per_question` while checking plumbing, as long as you restore
+protocol-affecting settings before any benchmark-quality run.
 
 For the real benchmark run, set it back to:
 
@@ -167,10 +176,13 @@ baseline accuracy vs steered accuracy
 - Steering library: `steering-vectors`
 - Model loading: Hugging Face `transformers`
 - Dataset loading: Hugging Face `datasets`
+- Python runtime: `>=3.14,<3.15`, with `.python-version` set to `3.14.2`
 - Python package management: `uv`
+- Locked environment: `uv.lock`
 - Training positives: model-generated responses whose extracted answer matches the validation gold answer.
 - Training negatives: model-generated responses whose extracted answer differs from the validation gold answer.
 - Training sampling: controlled by `train_generations_per_question`, `train_temperature`, and `train_top_p`.
+- Evaluation decoding: deterministic by default through `do_sample=False`.
 - Activation collection: `activation_collection.py` mines and pairs generated validation responses for vector training.
 - Shared generation: `generation.py` owns model completion for both activation collection and evaluation.
 
@@ -182,27 +194,47 @@ is exposed through a multimodal image-text model class, the code uses `AutoProce
 
 ```text
 .
+├── .gitignore
+├── .python-version
 ├── AGENTS.md
+├── paper
+│   └── paper.tex
+├── paper.pdf
 ├── pyproject.toml
 ├── README.md
-└── src
-    └── physics_steering_vectors
-        ├── __init__.py
-        ├── __main__.py
-        ├── activation_collection.py
-        ├── answer_extraction.py
-        ├── config.py
-        ├── data.py
-        ├── evaluation.py
-        ├── generation.py
-        ├── layers.py
-        ├── main.py
-        ├── modeling.py
-        ├── phases.py
-        ├── reporting.py
-        ├── reproducibility.py
-        ├── schemas.py
-        └── steering.py
+├── src
+│   └── physics_steering_vectors
+│       ├── __init__.py
+│       ├── __main__.py
+│       ├── activation_collection.py
+│       ├── answer_extraction.py
+│       ├── config.py
+│       ├── data.py
+│       ├── evaluation.py
+│       ├── generation.py
+│       ├── layers.py
+│       ├── main.py
+│       ├── modeling.py
+│       ├── phases.py
+│       ├── reporting.py
+│       ├── reproducibility.py
+│       ├── schemas.py
+│       └── steering.py
+├── tests
+│   ├── test_activation_collection.py
+│   ├── test_answer_extraction.py
+│   ├── test_config_schemas.py
+│   ├── test_data.py
+│   ├── test_evaluation.py
+│   ├── test_generation.py
+│   ├── test_layers.py
+│   ├── test_modeling.py
+│   ├── test_module_entrypoint.py
+│   ├── test_phases_main.py
+│   ├── test_reporting.py
+│   ├── test_reproducibility.py
+│   └── test_steering.py
+└── uv.lock
 ```
 
 ## File-by-File Context
@@ -210,7 +242,8 @@ is exposed through a multimodal image-text model class, the code uses `AutoProce
 ### `pyproject.toml`
 
 Local function:
-- Declares project metadata, dependencies, build backend, and the `physics-steering` console script.
+- Declares project metadata, Python version constraints, dependencies, pytest configuration, build
+  backend, and the `physics-steering` console script.
 
 Global role:
 - Defines the reproducible Python environment needed to run the experiment with `uv`.
@@ -225,6 +258,33 @@ Key dependencies:
 - `tqdm`: progress bars.
 - `accelerate`: model device placement through `device_map="auto"`.
 - `pytest`: unit test runner for deterministic logic.
+
+### `.python-version` and `uv.lock`
+
+Local function:
+- Pin the local Python interpreter target and exact dependency resolution.
+
+Global role:
+- Keep development, tests, and experiment runs aligned across machines that use `uv`.
+
+### `tests/`
+
+Local function:
+- Contains unit tests for answer extraction, data formatting, generation helpers, layer inference,
+  model loading adapters, activation-pair assembly, evaluation, reporting, reproducibility,
+  steering-library integration, and top-level phase orchestration.
+
+Global role:
+- Protects deterministic project logic without requiring model downloads, GPU access, or full
+  experiment execution.
+
+### `paper/` and `paper.pdf`
+
+Local function:
+- Store the LaTeX source and rendered PDF for the steering formulation write-up.
+
+Global role:
+- Keep the research rationale and formulation alongside the executable experiment.
 
 ### `src/physics_steering_vectors/config.py`
 
