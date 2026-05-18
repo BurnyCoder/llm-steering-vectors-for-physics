@@ -1,7 +1,7 @@
 """Top-level experiment protocol.
 
 Sources Used:
-- Qwen3.5 model card: https://huggingface.co/Qwen/Qwen3.5-0.8B
+- Qwen2.5 model card: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
 - MMLU-Pro dataset card: https://huggingface.co/datasets/TIGER-Lab/MMLU-Pro
 - steering-vectors docs: https://steering-vectors.github.io/steering-vectors/basic_usage.html
 
@@ -27,7 +27,7 @@ def main() -> None:
     """Run the full experiment.
 
     Sources Used:
-    - Qwen3.5 model card: https://huggingface.co/Qwen/Qwen3.5-0.8B
+    - Qwen2.5 model card: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
     - MMLU-Pro official repo: https://github.com/TIGER-AI-Lab/MMLU-Pro
     - steering-vectors basic usage: https://steering-vectors.github.io/steering-vectors/basic_usage.html
 
@@ -40,7 +40,7 @@ def main() -> None:
 
     config = ExperimentConfig()  # Local: instantiate settings. Global: define exact model/data/sweep protocol.
 
-    model_bundle = phase_1_model_setup(config)  # Local: load Qwen3.5 and hooks. Global: create model to steer and evaluate.
+    model_bundle = phase_1_model_setup(config)  # Local: load Qwen and hooks. Global: create model to steer and evaluate.
     benchmark_splits = phase_2_benchmark_setup(config)  # Local: load Physics rows. Global: define validation/test data.
     training_pairs = phase_3_contrast_pair_setup(config, model_bundle, benchmark_splits)  # Local: mine contrast pairs. Global: define steering signal.
 

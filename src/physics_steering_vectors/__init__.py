@@ -1,7 +1,7 @@
-"""Qwen3.5 steering-vector experiment for MMLU-Pro Physics.
+"""Qwen steering-vector experiment for MMLU-Pro Physics.
 
 Sources Used:
-- Qwen3.5 model card: https://huggingface.co/Qwen/Qwen3.5-0.8B
+- Qwen2.5 model card: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
 - MMLU-Pro dataset card: https://huggingface.co/datasets/TIGER-Lab/MMLU-Pro
 - steering-vectors docs: https://steering-vectors.github.io/steering-vectors/basic_usage.html
 

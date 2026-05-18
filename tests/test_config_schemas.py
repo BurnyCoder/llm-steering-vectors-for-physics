@@ -9,7 +9,7 @@ from physics_steering_vectors.schemas import BenchmarkSplits, EvaluationRecord, 
 def test_experiment_config_defaults_capture_protocol_settings() -> None:
     config = ExperimentConfig()
 
-    assert config.model_id == "Qwen/Qwen3.5-0.8B"
+    assert config.model_id == "Qwen/Qwen2.5-0.5B-Instruct"
     assert config.dataset_id == "TIGER-Lab/MMLU-Pro"
     assert config.subject == "physics"
     assert config.layer_sweep == (6, 12, 18)

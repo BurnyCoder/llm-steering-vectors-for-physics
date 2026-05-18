@@ -1,8 +1,8 @@
 """Baseline and steered benchmark evaluation.
 
 Sources Used:
-- Qwen3.5 model card: https://huggingface.co/Qwen/Qwen3.5-0.8B
-- Transformers Qwen3.5 docs: https://huggingface.co/docs/transformers/main/en/model_doc/qwen3_5
+- Qwen2.5 model card: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
+- Transformers Qwen2 docs: https://huggingface.co/docs/transformers/model_doc/qwen2
 - SteeringVector API: https://steering-vectors.github.io/steering-vectors/api/steering_vector.html
 - MMLU-Pro official repo: https://github.com/TIGER-AI-Lab/MMLU-Pro
 
@@ -38,7 +38,7 @@ def evaluate(
     """Evaluate one condition.
 
     Sources Used:
-    - Transformers generation docs: https://huggingface.co/docs/transformers/main/en/model_doc/qwen3_5
+    - Transformers generation docs: https://huggingface.co/docs/transformers/model_doc/qwen2
     - SteeringVector.apply docs: https://steering-vectors.github.io/steering-vectors/api/steering_vector.html
     - MMLU-Pro official repo: https://github.com/TIGER-AI-Lab/MMLU-Pro
 
