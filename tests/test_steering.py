@@ -1,7 +1,10 @@
+import torch
+from steering_vectors import SteeringVector
+
 from physics_steering_vectors import steering
 from physics_steering_vectors.config import ExperimentConfig
 from physics_steering_vectors.schemas import ModelBundle
-from physics_steering_vectors.steering import train_vector_for_layer
+from physics_steering_vectors.steering import load_steering_vector, save_steering_vector, steering_vector_path, train_vector_for_layer
 
 
 def test_train_vector_for_layer_calls_library_with_project_defaults(monkeypatch) -> None:
@@ -37,3 +40,33 @@ def test_train_vector_for_layer_calls_library_with_project_defaults(monkeypatch)
         "batch_size": 3,
         "show_progress": True,
     }
+
+
+def test_steering_vector_path_uses_configured_artifact_directory() -> None:
+    config = ExperimentConfig(model_id="org/model", subject="physics", seed=7, steering_vector_dir="custom/vectors")
+
+    assert steering_vector_path(config, layer=12).as_posix() == "custom/vectors/org__model_physics_seed_7_layer_12.pt"
+
+
+def test_save_and_load_steering_vector_round_trips_tensor_state(tmp_path) -> None:
+    vector = SteeringVector(
+        layer_activations={
+            8: torch.tensor([1.0, 2.0]),
+            9: torch.tensor([3.0, 4.0]),
+        },
+        layer_type="decoder_block",
+    )
+    path = tmp_path / "nested" / "vector.pt"
+
+    saved_path = save_steering_vector(vector, path, metadata={"layer": 8})
+    loaded = load_steering_vector(saved_path)
+    payload = torch.load(saved_path, map_location="cpu", weights_only=True)
+
+    assert saved_path == path
+    assert path.exists()
+    assert payload["format_version"] == steering.VECTOR_FILE_VERSION
+    assert payload["metadata"] == {"layer": 8}
+    assert loaded.layer_type == vector.layer_type
+    assert loaded.layer_activations.keys() == vector.layer_activations.keys()
+    assert torch.equal(loaded.layer_activations[8], vector.layer_activations[8])
+    assert torch.equal(loaded.layer_activations[9], vector.layer_activations[9])

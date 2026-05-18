@@ -14,6 +14,7 @@ def test_experiment_config_defaults_capture_protocol_settings() -> None:
     assert config.subject == "physics"
     assert config.layer_sweep == (6, 12, 18)
     assert config.multipliers == (0.5, 1.0, 1.5, 2.0)
+    assert config.steering_vector_dir == "artifacts/steering_vectors"
 
 
 def test_experiment_config_is_frozen() -> None:
