@@ -20,7 +20,11 @@ from physics_steering_vectors.modeling import load_qwen_bundle  # Local: model s
 from physics_steering_vectors.reporting import print_result_table  # Local: output table. Global: final comparison.
 from physics_steering_vectors.reproducibility import set_reproducibility  # Local: seed setup. Global: repeatability.
 from physics_steering_vectors.schemas import BenchmarkSplits, EvaluationResult, ModelBundle  # Local: typed phase boundaries. Global: readable pipeline.
-from physics_steering_vectors.steering import train_vector_for_layer  # Local: vector training. Global: intervention creation.
+from physics_steering_vectors.steering import (  # Local: vector training/persistence. Global: intervention creation and preservation.
+    save_steering_vector,
+    steering_vector_path,
+    train_vector_for_layer,
+)
 
 
 def phase_1_model_setup(config: ExperimentConfig) -> ModelBundle:
@@ -134,6 +138,21 @@ def phase_5_steering_sweep(
 
     for layer in config.layer_sweep:  # Local: iterate selected layers. Global: test where intervention works best.
         vector = train_vector_for_layer(config, bundle, training_pairs, layer)  # Local: train layer vector. Global: create intervention.
+        vector_path = save_steering_vector(  # Local: persist once per trained layer. Global: preserve intervention independent of multiplier sweep.
+            vector,
+            steering_vector_path(config, layer),
+            metadata={
+                "model_id": config.model_id,
+                "dataset_id": config.dataset_id,
+                "subject": config.subject,
+                "seed": config.seed,
+                "layer": layer,
+                "train_batch_size": config.train_batch_size,
+                "train_generations_per_question": config.train_generations_per_question,
+                "read_token_index": -1,
+            },
+        )
+        print(f"Saved steering vector: {vector_path}")  # Local: report artifact path. Global: make experiment outputs auditable.
 
         for multiplier in config.multipliers:  # Local: iterate steering strengths. Global: test dose response.
             label = f"layer_{layer}_mult_{multiplier}"  # Local: name condition. Global: identify row in report.

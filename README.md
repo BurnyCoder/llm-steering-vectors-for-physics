@@ -107,6 +107,20 @@ For the real benchmark run, set it back to:
 max_test_examples: int | None = None
 ```
 
+## Steering Vector Artifacts
+
+Each trained layer vector is saved after training and before multiplier evaluation. By default,
+artifacts are written under:
+
+```text
+artifacts/steering_vectors/
+```
+
+These `.pt` files contain a versioned PyTorch payload with the vector's `layer_type`,
+CPU `layer_activations`, and run metadata. They are generated local artifacts and are ignored by
+Git. Use `load_steering_vector()` from `src/physics_steering_vectors/steering.py` to reconstruct a
+`SteeringVector` for later analysis or reuse.
+
 ## Expected Output
 
 The script prints:
@@ -116,8 +130,10 @@ The script prints:
 3. Number of test Physics rows.
 4. A progress bar while mining generated validation responses.
 5. Counts for mined positive responses, negative responses, unparsable responses, and usable training pairs.
-6. Progress bars for baseline and steered evaluations.
-7. A final table like:
+6. Progress for baseline evaluation.
+7. Progress for each trained steering vector and steered evaluation.
+8. Saved steering-vector artifact paths, one per trained layer.
+9. A final table like:
 
 ```text
               label  correct  total  accuracy  delta_vs_baseline
@@ -147,7 +163,7 @@ are stable or isolated.
 MMLU-Pro validation physics rows
         |
         v
-sampled unsteered Qwen3.5 responses
+sampled unsteered Qwen2.5 responses
         |
         v
 answer extraction and correct/incorrect classification
@@ -162,7 +178,10 @@ steering-vectors train_steering_vector()
 layer-specific activation steering vector
         |
         v
-Qwen3.5 generation on MMLU-Pro test physics rows
+saved .pt vector artifact
+        |
+        v
+Qwen2.5 generation on MMLU-Pro test physics rows
         |
         v
 baseline accuracy vs steered accuracy
@@ -170,7 +189,7 @@ baseline accuracy vs steered accuracy
 
 ## Current Design Choices
 
-- Model: `Qwen/Qwen3.5-0.8B`
+- Model: `Qwen/Qwen2.5-0.5B-Instruct`
 - Benchmark: `TIGER-Lab/MMLU-Pro`
 - Subject/category: `physics`
 - Steering library: `steering-vectors`
@@ -182,13 +201,14 @@ baseline accuracy vs steered accuracy
 - Training positives: model-generated responses whose extracted answer matches the validation gold answer.
 - Training negatives: model-generated responses whose extracted answer differs from the validation gold answer.
 - Training sampling: controlled by `train_generations_per_question`, `train_temperature`, and `train_top_p`.
+- Vector artifacts: saved under `steering_vector_dir`, which defaults to `artifacts/steering_vectors`.
 - Evaluation decoding: deterministic by default through `do_sample=False`.
 - Activation collection: `activation_collection.py` mines and pairs generated validation responses for vector training.
 - Shared generation: `generation.py` owns model completion for both activation collection and evaluation.
 
-The model choice follows the "strict latest Qwen3.5 small model" direction. Because this checkpoint
-is exposed through a multimodal image-text model class, the code uses `AutoProcessor` and
-`AutoModelForImageTextToText` rather than a plain causal-LM loader.
+The current default is a small Qwen2.5 text-generation checkpoint. The code loads it with
+`AutoTokenizer` and `AutoModelForCausalLM`, then infers the decoder-block hook path from the actual
+loaded module names before training or applying steering vectors.
 
 ## Repository Structure
 
@@ -250,7 +270,7 @@ Global role:
 
 Key dependencies:
 - `torch`: model inference and activation computation.
-- `transformers`: Qwen3.5 model and processor loading.
+- `transformers`: Qwen2.5 text model and tokenizer loading.
 - `datasets`: MMLU-Pro loading from the Hugging Face Hub.
 - `steering-vectors`: activation recording, vector training, and steering application.
 - `pandas`: result table formatting.
@@ -304,6 +324,9 @@ Important fields:
 - `train_generations_per_question`: sampled unsteered completions to mine per validation row.
 - `train_temperature`: sampling temperature used only while mining training responses.
 - `train_top_p`: nucleus sampling value used only while mining training responses.
+- `train_batch_size`: activation-training batch size passed to `train_steering_vector()`.
+- `steering_vector_dir`: directory for generated `.pt` steering-vector artifacts.
+- `do_sample`: evaluation decoding mode, deterministic by default.
 
 ### `src/physics_steering_vectors/schemas.py`
 
@@ -330,21 +353,21 @@ Global role:
 ### `src/physics_steering_vectors/layers.py`
 
 Local function:
-- Inspects the loaded Qwen3.5 module names and infers a decoder block path template.
+- Inspects the loaded Qwen module names and infers a decoder block path template.
 
 Global role:
-- Bridges the Qwen3.5 model structure to the `steering-vectors` hook API.
+- Bridges the Qwen model structure to the `steering-vectors` hook API.
 
 Why this exists:
 - Steering libraries need to know which internal module corresponds to "layer 6" or "layer 12".
-- Qwen3.5 may expose the text model under a wrapper path, so the code discovers the path from the
+- Qwen models may expose decoder blocks under different wrapper paths, so the code discovers the path from the
   actual loaded model instead of assuming one fixed module name.
 
 ### `src/physics_steering_vectors/modeling.py`
 
 Local function:
-- Loads `Qwen/Qwen3.5-0.8B`, gets the tokenizer from the processor, configures padding, and builds
-  the layer hook config.
+- Loads the configured Qwen text checkpoint, configures tokenizer padding, and builds the layer hook
+  config.
 
 Global role:
 - Produces the model runtime shared by vector training and benchmark evaluation.
@@ -397,13 +420,14 @@ If no answer letter is found, the prediction is `None` and the row is counted as
 ### `src/physics_steering_vectors/steering.py`
 
 Local function:
-- Wraps one call to `train_steering_vector()`.
+- Wraps one call to `train_steering_vector()` and persists trained vector state.
 
 Global role:
-- Produces the activation intervention that is later applied during benchmark generation.
+- Produces the activation intervention that is later applied during benchmark generation and saved for reuse.
 
 The current implementation trains one vector per selected layer, using the final token activation
-from each positive/negative prompt pair.
+from each positive/negative prompt pair. Saved vector artifacts live under
+`artifacts/steering_vectors/` by default.
 
 ### `src/physics_steering_vectors/evaluation.py`
 
@@ -476,8 +500,8 @@ phase_6_report([baseline, *steered_results])
 
 Model and model loading:
 
-- Qwen3.5 model card: https://huggingface.co/Qwen/Qwen3.5-0.8B
-- Transformers Qwen3.5 docs: https://huggingface.co/docs/transformers/main/en/model_doc/qwen3_5
+- Qwen2.5 model card: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
+- Transformers Qwen2 docs: https://huggingface.co/docs/transformers/model_doc/qwen2
 
 Benchmark:
 

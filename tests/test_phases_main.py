@@ -61,6 +61,7 @@ def test_phase_5_steering_sweep_trains_each_layer_and_evaluates_each_multiplier(
     bundle = ModelBundle(model=None, processor=None, tokenizer=None, layer_config={})
     training_pairs = [("positive", "negative")]
     trained_layers: list[int] = []
+    saved_vectors: list[tuple[object, object, object]] = []
     evaluate_calls: list[dict[str, object]] = []
 
     def fake_train_vector_for_layer(config_arg, bundle_arg, pairs_arg, layer: int) -> str:
@@ -72,11 +73,47 @@ def test_phase_5_steering_sweep_trains_each_layer_and_evaluates_each_multiplier(
         return EvaluationResult(label=str(kwargs["label"]), correct=0, total=1, accuracy=0.0, records=[])
 
     monkeypatch.setattr(phases, "train_vector_for_layer", fake_train_vector_for_layer)
+    monkeypatch.setattr(phases, "steering_vector_path", lambda config_arg, layer: f"path-{layer}.pt")
+    monkeypatch.setattr(
+        phases,
+        "save_steering_vector",
+        lambda vector, path, metadata=None: saved_vectors.append((vector, path, metadata)) or path,
+    )
     monkeypatch.setattr(phases, "evaluate", fake_evaluate)
 
     results = phases.phase_5_steering_sweep(config, bundle, splits, training_pairs)
 
     assert trained_layers == [1, 2]
+    assert saved_vectors == [
+        (
+            "vector-1",
+            "path-1.pt",
+            {
+                "model_id": config.model_id,
+                "dataset_id": config.dataset_id,
+                "subject": config.subject,
+                "seed": config.seed,
+                "layer": 1,
+                "train_batch_size": config.train_batch_size,
+                "train_generations_per_question": config.train_generations_per_question,
+                "read_token_index": -1,
+            },
+        ),
+        (
+            "vector-2",
+            "path-2.pt",
+            {
+                "model_id": config.model_id,
+                "dataset_id": config.dataset_id,
+                "subject": config.subject,
+                "seed": config.seed,
+                "layer": 2,
+                "train_batch_size": config.train_batch_size,
+                "train_generations_per_question": config.train_generations_per_question,
+                "read_token_index": -1,
+            },
+        ),
+    ]
     assert [result.label for result in results] == [
         "layer_1_mult_0.5",
         "layer_1_mult_1.0",
