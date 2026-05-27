@@ -20,10 +20,12 @@ import torch  # Local: serialize tensor payloads. Global: persist trained steeri
 from steering_vectors import SteeringVector, train_steering_vector  # Source: steering-vectors docs. Local: train/recreate direction. Global: core library reuse.
 
 from physics_steering_vectors.config import ExperimentConfig  # Local: read batch settings. Global: central protocol.
+from physics_steering_vectors.logging_utils import get_logger, log_text_block  # Local: vector input logs. Global: terminal audit trail.
 from physics_steering_vectors.schemas import ModelBundle  # Local: access model/tokenizer/hook config. Global: shared runtime.
 
 
 VECTOR_FILE_VERSION = 1  # Local: version saved vector payloads. Global: fail clearly if the format changes later.
+logger = get_logger(__name__)
 
 
 def steering_vector_path(config: ExperimentConfig, layer: int) -> Path:
@@ -42,7 +44,9 @@ def steering_vector_path(config: ExperimentConfig, layer: int) -> Path:
     model_slug = config.model_id.replace("/", "__")  # Local: make model ID path-safe. Global: keep filenames traceable to model choice.
     subject_slug = config.subject.replace("/", "__")  # Local: make subject path-safe. Global: keep artifact names benchmark-specific.
     filename = f"{model_slug}_{subject_slug}_seed_{config.seed}_layer_{layer}.pt"  # Local: one file per trained layer. Global: avoid multiplier-specific duplicates.
-    return Path(config.steering_vector_dir) / filename  # Local: combine configured directory and file. Global: centralize artifact layout.
+    path = Path(config.steering_vector_dir) / filename  # Local: combine configured directory and file. Global: centralize artifact layout.
+    logger.debug("Computed steering vector path layer=%d path=%s", layer, path)
+    return path
 
 
 def save_steering_vector(
@@ -63,6 +67,17 @@ def save_steering_vector(
     - Preserves trained interventions without pickling the full external object.
     """
 
+    logger.info("Saving steering vector path=%s metadata=%s", path, metadata or {})
+    for layer, activation in vector.layer_activations.items():
+        activation_cpu = activation.detach().cpu()
+        logger.debug(
+            "Steering vector tensor layer=%s shape=%s dtype=%s norm=%s",
+            layer,
+            tuple(activation_cpu.shape),
+            activation_cpu.dtype,
+            torch.linalg.vector_norm(activation_cpu.float()).item() if activation_cpu.numel() else 0.0,
+        )
+
     path.parent.mkdir(parents=True, exist_ok=True)  # Local: create artifact directory lazily. Global: runs work from a clean checkout.
     payload = {  # Local: store only simple metadata and tensors. Global: keep files reconstructable across Python sessions.
         "format_version": VECTOR_FILE_VERSION,
@@ -74,6 +89,7 @@ def save_steering_vector(
         "metadata": metadata or {},
     }
     torch.save(payload, path)  # Local: serialize tensor payload. Global: write reusable steering-vector artifact.
+    logger.info("Saved steering vector path=%s format_version=%d", path, VECTOR_FILE_VERSION)
     return path  # Local: return exact saved location. Global: phase output can report where the vector went.
 
 
@@ -91,16 +107,19 @@ def load_steering_vector(path: Path, map_location: Any = "cpu") -> SteeringVecto
     - Enables later analysis or reuse without retraining in the same process.
     """
 
+    logger.info("Loading steering vector path=%s map_location=%s", path, map_location)
     payload = torch.load(path, map_location=map_location, weights_only=True)  # Local: load primitive/tensor payload. Global: avoid arbitrary object pickle loading.
     if payload.get("format_version") != VECTOR_FILE_VERSION:  # Local: validate persistence schema. Global: catch incompatible artifact versions early.
         raise ValueError(f"Unsupported steering vector file format: {payload.get('format_version')}")
-    return SteeringVector(  # Source: SteeringVector dataclass. Local: restore apply-compatible vector. Global: reuse saved intervention.
+    vector = SteeringVector(  # Source: SteeringVector dataclass. Local: restore apply-compatible vector. Global: reuse saved intervention.
         layer_activations={
             int(layer): activation
             for layer, activation in payload["layer_activations"].items()
         },
         layer_type=payload["layer_type"],
     )
+    logger.info("Loaded steering vector path=%s layers=%s layer_type=%s", path, sorted(vector.layer_activations), vector.layer_type)
+    return vector
 
 
 def train_vector_for_layer(
@@ -121,7 +140,27 @@ def train_vector_for_layer(
     - Creates the intervention later applied during benchmark generation.
     """
 
-    return train_steering_vector(  # Source: steering-vectors API. Local: train vector. Global: reuse existing library instead of hand-rolling hooks.
+    logger.info(
+        "Training steering vector layer=%d training_pairs=%d batch_size=%d read_token_index=-1 layer_type=decoder_block",
+        layer,
+        len(training_pairs),
+        config.train_batch_size,
+    )
+    for pair_index, (positive, negative) in enumerate(training_pairs):
+        log_text_block(
+            logger,
+            config.log_full_text,
+            f"steering_vector_library_input layer={layer} pair_index={pair_index} side=positive",
+            positive,
+        )
+        log_text_block(
+            logger,
+            config.log_full_text,
+            f"steering_vector_library_input layer={layer} pair_index={pair_index} side=negative",
+            negative,
+        )
+
+    vector = train_steering_vector(  # Source: steering-vectors API. Local: train vector. Global: reuse existing library instead of hand-rolling hooks.
         bundle.model,  # Local: model to record activations from. Global: exact same model evaluated later.
         bundle.tokenizer,  # Local: tokenize training pairs. Global: keep activation prompts model-native.
         training_pairs,  # Local: positive/negative strings. Global: accurate-minus-inaccurate physics direction.
@@ -132,3 +171,5 @@ def train_vector_for_layer(
         batch_size=config.train_batch_size,  # Local: memory-aware batch size. Global: keeps experiment runnable.
         show_progress=True,  # Local: show training progress. Global: long runs remain observable.
     )
+    logger.info("Finished training steering vector layer=%d", layer)
+    return vector

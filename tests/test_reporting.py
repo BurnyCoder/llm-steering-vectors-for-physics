@@ -16,9 +16,9 @@ def test_print_result_table_sorts_by_accuracy_and_computes_delta(capsys) -> None
     print_result_table([result("baseline", 1, 2), result("steered", 3, 4)])
 
     output = capsys.readouterr().out
-    lines = output.splitlines()
-    assert "steered" in lines[1]
-    assert "baseline" in lines[2]
+    table_lines = [line for line in output.splitlines() if line.lstrip().startswith(("label", "steered", "baseline"))]
+    assert "steered" in table_lines[1]
+    assert "baseline" in table_lines[2]
     assert "delta_vs_baseline" in output
     assert "0.25" in output
 

@@ -2,10 +2,12 @@ import pytest
 
 from physics_steering_vectors import evaluation
 from physics_steering_vectors.config import ExperimentConfig
+from physics_steering_vectors.logging_utils import configure_logging
 
 
-def test_evaluate_generates_extracts_and_scores_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_evaluate_generates_extracts_and_scores_rows(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     config = ExperimentConfig()
+    configure_logging(config)
     rows = [
         {"question_id": "10", "question": "Q1", "options": ["a", "b"], "answer": "A"},
         {"question_id": "11", "question": "Q2", "options": ["a", "b", "c"], "answer": "B"},
@@ -19,6 +21,7 @@ def test_evaluate_generates_extracts_and_scores_rows(monkeypatch: pytest.MonkeyP
         prompt: str,
         steering_vector: object | None = None,
         multiplier: float = 1.0,
+        log_context: str | None = None,
     ) -> str:
         calls.append(
             {
@@ -27,6 +30,7 @@ def test_evaluate_generates_extracts_and_scores_rows(monkeypatch: pytest.MonkeyP
                 "prompt": prompt,
                 "steering_vector": steering_vector,
                 "multiplier": multiplier,
+                "log_context": log_context,
             }
         )
         return next(completions)
@@ -54,6 +58,13 @@ def test_evaluate_generates_extracts_and_scores_rows(monkeypatch: pytest.MonkeyP
     assert calls[0]["prompt"].startswith("FEWSHOT\n\nQuestion:\nQ1")
     assert all(call["steering_vector"] == "vector" for call in calls)
     assert all(call["multiplier"] == 2.0 for call in calls)
+    assert calls[0]["log_context"] == "evaluation label=steered row_index=0 question_id=10"
+    output = capsys.readouterr().out
+    assert "evaluation label=steered row_index=0 question_id=10 LLM_PROMPT" in output
+    assert "FEWSHOT\n\nQuestion:\nQ1" in output
+    assert "evaluation label=steered row_index=0 question_id=10 LLM_COMPLETION" in output
+    assert "Answer: A" in output
+    assert "gold=A prediction=A is_correct=True" in output
 
 
 def test_evaluate_handles_empty_rows(monkeypatch: pytest.MonkeyPatch) -> None:

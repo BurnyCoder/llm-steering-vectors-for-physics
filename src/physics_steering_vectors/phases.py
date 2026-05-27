@@ -16,6 +16,7 @@ from physics_steering_vectors.activation_collection import build_training_pairs 
 from physics_steering_vectors.config import ExperimentConfig  # Local: phase settings. Global: single protocol object.
 from physics_steering_vectors.data import load_physics_splits  # Local: load benchmark rows. Global: benchmark setup.
 from physics_steering_vectors.evaluation import evaluate  # Local: score condition. Global: baseline/intervention measurement.
+from physics_steering_vectors.logging_utils import get_logger  # Local: phase logs. Global: terminal audit trail.
 from physics_steering_vectors.modeling import load_qwen_bundle  # Local: model setup. Global: shared runtime.
 from physics_steering_vectors.reporting import print_result_table, write_result_report  # Local: output table. Global: final comparison.
 from physics_steering_vectors.reproducibility import set_reproducibility  # Local: seed setup. Global: repeatability.
@@ -25,6 +26,9 @@ from physics_steering_vectors.steering import (  # Local: vector training/persis
     steering_vector_path,
     train_vector_for_layer,
 )
+
+
+logger = get_logger(__name__)
 
 
 def phase_1_model_setup(config: ExperimentConfig) -> ModelBundle:
@@ -41,9 +45,11 @@ def phase_1_model_setup(config: ExperimentConfig) -> ModelBundle:
     - Creates the model runtime that all later phases share.
     """
 
+    logger.info("Phase 1 model setup starting model_id=%s seed=%s", config.model_id, config.seed)
     set_reproducibility(config.seed)  # Local: seed process. Global: make comparisons repeatable.
     bundle = load_qwen_bundle(config)  # Local: load model/tokenizer/hooks. Global: prepare object to steer/evaluate.
-    print(f"Decoder hook template: {bundle.layer_config['decoder_block']}")  # Local: show hook path. Global: audit intervention target.
+    logger.info("Decoder hook template: %s", bundle.layer_config["decoder_block"])  # Local: show hook path. Global: audit intervention target.
+    logger.info("Phase 1 model setup complete")
     return bundle  # Local: return model bundle. Global: pass to downstream phases.
 
 
@@ -61,9 +67,11 @@ def phase_2_benchmark_setup(config: ExperimentConfig) -> BenchmarkSplits:
     - Defines both steering-training data and held-out evaluation data.
     """
 
+    logger.info("Phase 2 benchmark setup starting dataset_id=%s subject=%s", config.dataset_id, config.subject)
     splits = load_physics_splits(config)  # Local: load/filter/format data. Global: create benchmark splits.
-    print(f"Validation physics rows: {len(splits.validation)}")  # Local: show validation size. Global: audit steering data volume.
-    print(f"Test physics rows: {len(splits.test)}")  # Local: show test size. Global: audit evaluation data volume.
+    logger.info("Validation physics rows: %d", len(splits.validation))  # Local: show validation size. Global: audit steering data volume.
+    logger.info("Test physics rows: %d", len(splits.test))  # Local: show test size. Global: audit evaluation data volume.
+    logger.info("Phase 2 benchmark setup complete")
     return splits  # Local: return prepared data. Global: pass to contrast/eval phases.
 
 
@@ -84,8 +92,10 @@ def phase_3_contrast_pair_setup(
     - Defines the activation direction as accurate physics solution minus inaccurate solution.
     """
 
+    logger.info("Phase 3 contrast-pair setup starting validation_rows=%d", len(splits.validation))
     training_pairs = build_training_pairs(config, bundle, splits.validation)  # Local: mine tuples. Global: input to steering-vector training.
-    print(f"Training contrast pairs: {len(training_pairs)}")  # Local: show count. Global: audit vector training signal.
+    logger.info("Training contrast pairs: %d", len(training_pairs))  # Local: show count. Global: audit vector training signal.
+    logger.info("Phase 3 contrast-pair setup complete")
     return training_pairs  # Local: return pairs. Global: pass to steering sweep.
 
 
@@ -106,13 +116,16 @@ def phase_4_baseline_evaluation(
     - Provides the control condition for all steering deltas.
     """
 
-    return evaluate(  # Local: run benchmark. Global: baseline score.
+    logger.info("Phase 4 baseline evaluation starting test_rows=%d", len(splits.test))
+    result = evaluate(  # Local: run benchmark. Global: baseline score.
         config=config,
         bundle=bundle,
         rows=splits.test,
         fewshot_prefix=splits.fewshot_prefix,
         label="baseline",
     )
+    logger.info("Phase 4 baseline evaluation complete accuracy=%.6f correct=%d total=%d", result.accuracy, result.correct, result.total)
+    return result
 
 
 def phase_5_steering_sweep(
@@ -134,9 +147,17 @@ def phase_5_steering_sweep(
     - Tests whether activation steering improves held-out physics benchmark accuracy.
     """
 
+    logger.info(
+        "Phase 5 steering sweep starting layers=%s multipliers=%s training_pairs=%d test_rows=%d",
+        config.layer_sweep,
+        config.multipliers,
+        len(training_pairs),
+        len(splits.test),
+    )
     results: list[EvaluationResult] = []  # Local: collect steered scores. Global: compare all interventions.
 
     for layer in config.layer_sweep:  # Local: iterate selected layers. Global: test where intervention works best.
+        logger.info("Training steering vector for layer=%d", layer)
         vector = train_vector_for_layer(config, bundle, training_pairs, layer)  # Local: train layer vector. Global: create intervention.
         vector_path = save_steering_vector(  # Local: persist once per trained layer. Global: preserve intervention independent of multiplier sweep.
             vector,
@@ -152,22 +173,24 @@ def phase_5_steering_sweep(
                 "read_token_index": -1,
             },
         )
-        print(f"Saved steering vector: {vector_path}")  # Local: report artifact path. Global: make experiment outputs auditable.
+        logger.info("Saved steering vector: %s", vector_path)  # Local: report artifact path. Global: make experiment outputs auditable.
 
         for multiplier in config.multipliers:  # Local: iterate steering strengths. Global: test dose response.
             label = f"layer_{layer}_mult_{multiplier}"  # Local: name condition. Global: identify row in report.
-            results.append(  # Local: store condition result. Global: build comparison set.
-                evaluate(
-                    config=config,
-                    bundle=bundle,
-                    rows=splits.test,
-                    fewshot_prefix=splits.fewshot_prefix,
-                    label=label,
-                    steering_vector=vector,
-                    multiplier=multiplier,
-                )
+            logger.info("Evaluating steering condition label=%s layer=%d multiplier=%s", label, layer, multiplier)
+            result = evaluate(
+                config=config,
+                bundle=bundle,
+                rows=splits.test,
+                fewshot_prefix=splits.fewshot_prefix,
+                label=label,
+                steering_vector=vector,
+                multiplier=multiplier,
             )
+            logger.info("Completed steering condition label=%s accuracy=%.6f correct=%d total=%d", label, result.accuracy, result.correct, result.total)
+            results.append(result)  # Local: store condition result. Global: build comparison set.
 
+    logger.info("Phase 5 steering sweep complete conditions=%d", len(results))
     return results  # Local: return all intervention scores. Global: feed report phase.
 
 
@@ -184,7 +207,9 @@ def phase_6_report(config: ExperimentConfig, results: list[EvaluationResult]) ->
     - Shows and preserves whether steering improved physics performance.
     """
 
+    logger.info("Phase 6 report starting results=%d report_dir=%s", len(results), config.report_dir)
     print_result_table(results)  # Local: render table. Global: final experiment outcome.
     markdown_path, csv_path = write_result_report(results, config.report_dir)  # Local: persist table. Global: preserve run output.
-    print(f"Saved report: {markdown_path}")  # Local: show human-readable artifact. Global: make report easy to find.
-    print(f"Saved report CSV: {csv_path}")  # Local: show machine-readable artifact. Global: support later analysis.
+    logger.info("Saved report: %s", markdown_path)  # Local: show human-readable artifact. Global: make report easy to find.
+    logger.info("Saved report CSV: %s", csv_path)  # Local: show machine-readable artifact. Global: support later analysis.
+    logger.info("Phase 6 report complete")

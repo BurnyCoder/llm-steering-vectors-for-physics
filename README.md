@@ -213,6 +213,7 @@ baseline accuracy vs steered accuracy
 - Training sampling: controlled by `train_generations_per_question`, `train_temperature`, and `train_top_p`.
 - Vector artifacts: saved under `steering_vector_dir`, which defaults to `artifacts/steering_vectors`.
 - Report artifacts: saved under `report_dir`, which defaults to `artifacts/reports`.
+- Terminal logging: defaults to `DEBUG` and prints full prompts, completions, and steering-vector training text.
 - Evaluation decoding: deterministic by default through `do_sample=False`.
 - Activation collection: `activation_collection.py` mines and pairs generated validation responses for vector training.
 - Shared generation: `generation.py` owns model completion for both activation collection and evaluation.
@@ -338,6 +339,8 @@ Important fields:
 - `train_batch_size`: activation-training batch size passed to `train_steering_vector()`.
 - `steering_vector_dir`: directory for generated `.pt` steering-vector artifacts.
 - `report_dir`: directory for generated Markdown and CSV result reports.
+- `log_level`: terminal logging level, `DEBUG` by default.
+- `log_full_text`: whether full prompts, completions, and steering-vector library inputs are printed.
 - `do_sample`: evaluation decoding mode, deterministic by default.
 
 ### `src/physics_steering_vectors/schemas.py`

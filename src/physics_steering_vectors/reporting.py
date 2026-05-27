@@ -15,7 +15,11 @@ from pathlib import Path  # Local: create report artifact paths. Global: persist
 
 import pandas as pd  # Local: tabulate result rows. Global: readable final comparison.
 
+from physics_steering_vectors.logging_utils import get_logger, log_text_block  # Local: report logs. Global: terminal audit trail.
 from physics_steering_vectors.schemas import EvaluationResult  # Local: typed result input. Global: report phase contract.
+
+
+logger = get_logger(__name__)
 
 
 def build_result_frame(results: list[EvaluationResult]) -> pd.DataFrame:
@@ -31,6 +35,7 @@ def build_result_frame(results: list[EvaluationResult]) -> pd.DataFrame:
     - Gives printing and file output one shared table definition.
     """
 
+    logger.debug("Building result frame results=%d", len(results))
     baseline_accuracy = results[0].accuracy if results else 0.0  # Local: identify control accuracy. Global: compute intervention deltas.
     columns = ["label", "correct", "total", "accuracy", "delta_vs_baseline"]
     rows = [  # Local: flatten dataclasses. Global: prepare comparison table.
@@ -46,6 +51,7 @@ def build_result_frame(results: list[EvaluationResult]) -> pd.DataFrame:
     frame = pd.DataFrame(rows, columns=columns)  # Source: pandas DataFrame docs. Local: create table. Global: stable report shape.
     if rows:
         frame = frame.sort_values("accuracy", ascending=False)  # Local: sort populated table. Global: rank interventions.
+    logger.debug("Built result frame rows=%d columns=%s", len(frame.index), list(frame.columns))
     return frame  # Local: return tabular data. Global: reusable result artifact source.
 
 
@@ -62,7 +68,9 @@ def print_result_table(results: list[EvaluationResult]) -> None:
     - Shows whether any steering condition improved over baseline.
     """
 
-    print(build_result_frame(results).to_string(index=False))  # Local: print full table. Global: final research readout.
+    table_text = build_result_frame(results).to_string(index=False)
+    log_text_block(logger, True, "result_table", table_text)
+    print(table_text)  # Local: print full table. Global: final research readout.
 
 
 def write_result_report(
@@ -83,6 +91,7 @@ def write_result_report(
     - Preserves experiment results after terminal output scrolls away.
     """
 
+    logger.info("Writing result report report_dir=%s stem=%s results=%d", report_dir, stem, len(results))
     frame = build_result_frame(results)  # Local: use same table as terminal output. Global: keep printed/saved reports identical.
     output_dir = Path(report_dir)  # Local: accept config strings or caller Paths. Global: configurable artifact location.
     output_dir.mkdir(parents=True, exist_ok=True)  # Local: create artifact directory lazily. Global: runs work from a clean checkout.
@@ -96,4 +105,5 @@ def write_result_report(
         encoding="utf-8",
     )
     frame.to_csv(csv_path, index=False)  # Local: write machine-readable table. Global: support spreadsheet/notebook analysis.
+    logger.info("Wrote result report markdown_path=%s csv_path=%s", markdown_path, csv_path)
     return markdown_path, csv_path  # Local: expose paths to caller. Global: make saved artifacts discoverable.

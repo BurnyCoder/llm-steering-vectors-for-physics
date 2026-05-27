@@ -3,6 +3,7 @@ from steering_vectors import SteeringVector
 
 from physics_steering_vectors import steering
 from physics_steering_vectors.config import ExperimentConfig
+from physics_steering_vectors.logging_utils import configure_logging
 from physics_steering_vectors.schemas import ModelBundle
 from physics_steering_vectors.steering import load_steering_vector, save_steering_vector, steering_vector_path, train_vector_for_layer
 
@@ -40,6 +41,31 @@ def test_train_vector_for_layer_calls_library_with_project_defaults(monkeypatch)
         "batch_size": 3,
         "show_progress": True,
     }
+
+
+def test_train_vector_for_layer_logs_full_library_inputs(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(steering, "train_steering_vector", lambda *args, **kwargs: "vector")
+    bundle = ModelBundle(
+        model="model",
+        processor=None,
+        tokenizer="tokenizer",
+        layer_config={"decoder_block": "model.layers.{num}"},
+    )
+    config = ExperimentConfig(log_level="DEBUG", log_full_text=True)
+    configure_logging(config)
+
+    train_vector_for_layer(
+        config,
+        bundle,
+        [("FULL POSITIVE TEXT\nanswer is (A)", "FULL NEGATIVE TEXT\nanswer is (B)")],
+        layer=8,
+    )
+
+    output = capsys.readouterr().out
+    assert "steering_vector_library_input layer=8 pair_index=0 side=positive" in output
+    assert "FULL POSITIVE TEXT\nanswer is (A)" in output
+    assert "steering_vector_library_input layer=8 pair_index=0 side=negative" in output
+    assert "FULL NEGATIVE TEXT\nanswer is (B)" in output
 
 
 def test_steering_vector_path_uses_configured_artifact_directory() -> None:

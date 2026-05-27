@@ -16,7 +16,11 @@ from transformers import AutoModelForCausalLM, AutoTokenizer  # Source: Qwen2.5 
 
 from physics_steering_vectors.config import ExperimentConfig  # Local: read model id. Global: keep protocol centralized.
 from physics_steering_vectors.layers import infer_decoder_block_template  # Local: find hook path. Global: enable steering-vectors.
+from physics_steering_vectors.logging_utils import get_logger  # Local: model setup logs. Global: terminal audit trail.
 from physics_steering_vectors.schemas import ModelBundle  # Local: return typed bundle. Global: pass model runtime between phases.
+
+
+logger = get_logger(__name__)
 
 
 def load_qwen_bundle(config: ExperimentConfig) -> ModelBundle:
@@ -34,22 +38,35 @@ def load_qwen_bundle(config: ExperimentConfig) -> ModelBundle:
     - Produces the object all later phases use for both normal and steered inference.
     """
 
+    logger.info("Loading tokenizer model_id=%s", config.model_id)
     tokenizer = AutoTokenizer.from_pretrained(config.model_id)  # Source: Qwen2.5 model card. Local: load tokenizer assets. Global: ensures prompt tokens match checkpoint.
 
     model_kwargs = {"torch_dtype": "auto"}  # Source: Transformers loading convention. Local: choose checkpoint dtype automatically. Global: avoid manual dtype mismatch.
-    if torch.cuda.is_available():  # Source: PyTorch CUDA API. Local: detect GPU. Global: use available acceleration.
+    cuda_available = torch.cuda.is_available()
+    logger.info("CUDA available=%s", cuda_available)
+    if cuda_available:  # Source: PyTorch CUDA API. Local: detect GPU. Global: use available acceleration.
         model_kwargs["device_map"] = "auto"  # Source: Transformers/Accelerate convention. Local: place modules automatically. Global: simplify hardware setup.
 
+    logger.info("Loading model model_id=%s model_kwargs=%s", config.model_id, model_kwargs)
     model = AutoModelForCausalLM.from_pretrained(  # Source: Qwen2.5 model card. Local: load text generation model. Global: instantiate model to steer.
         config.model_id,  # Local: selected checkpoint id. Global: compatible small Qwen target.
         **model_kwargs,  # Local: pass dtype/device hints. Global: make loading practical across machines.
     ).eval()  # Source: PyTorch eval mode. Local: disable train-mode behavior. Global: keep benchmark inference consistent.
+    logger.info("Loaded model and set eval mode device=%s", getattr(model, "device", "unknown"))
 
     if tokenizer.pad_token_id is None:  # Source: HF tokenizer padding behavior. Local: check padding availability. Global: allow batched activation extraction.
         tokenizer.pad_token = tokenizer.eos_token  # Local: use EOS as pad fallback. Global: make decoder-only-style text batches possible.
+        logger.info("Tokenizer pad_token_id missing; set pad_token to eos_token")
     tokenizer.padding_side = "left"  # Source: HF generation convention. Local: pad prompts on left. Global: preserve final prompt tokens for generation/activation reads.
+    logger.debug(
+        "Tokenizer settings pad_token_id=%s eos_token_id=%s padding_side=%s",
+        getattr(tokenizer, "pad_token_id", None),
+        getattr(tokenizer, "eos_token_id", None),
+        tokenizer.padding_side,
+    )
 
     layer_config = {"decoder_block": infer_decoder_block_template(model)}  # Source: steering-vectors layer_config docs. Local: define hook matcher. Global: align vector layers to Qwen blocks.
+    logger.info("Inferred layer_config=%s", layer_config)
 
     return ModelBundle(  # Local: package runtime objects. Global: standard phase output.
         model=model,  # Local: loaded model. Global: used by training/eval.
@@ -74,6 +91,10 @@ def model_device(model: torch.nn.Module) -> torch.device:
 
     device = getattr(model, "device", None)  # Local: prefer HF device attr when exposed. Global: route tensors to model.
     if device is not None:
-        return torch.device(device)  # Local: normalize strings/devices. Global: keep tokenizer batch movement predictable.
+        resolved = torch.device(device)  # Local: normalize strings/devices. Global: keep tokenizer batch movement predictable.
+        logger.debug("Resolved model device from model.device=%s", resolved)
+        return resolved
 
-    return next(model.parameters()).device  # Local: fallback to first parameter. Global: support plain PyTorch modules.
+    resolved = next(model.parameters()).device  # Local: fallback to first parameter. Global: support plain PyTorch modules.
+    logger.debug("Resolved model device from first parameter=%s", resolved)
+    return resolved

@@ -7,6 +7,7 @@ from physics_steering_vectors.activation_collection import (
     pair_training_examples,
 )
 from physics_steering_vectors.config import ExperimentConfig
+from physics_steering_vectors.logging_utils import configure_logging
 
 
 def test_classify_generated_response_labels_correct_and_incorrect_answers() -> None:
@@ -48,8 +49,9 @@ def test_pair_training_examples_requires_both_classes() -> None:
         pair_training_examples(config, ["positive"], [])
 
 
-def test_build_training_pairs_mines_generated_positive_and_negative_responses(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_training_pairs_mines_generated_positive_and_negative_responses(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     config = ExperimentConfig(train_generations_per_question=2, seed=0)
+    configure_logging(config)
     rows = [
         {
             "question": "Which option is correct?",
@@ -82,6 +84,13 @@ def test_build_training_pairs_mines_generated_positive_and_negative_responses(mo
     assert all(call["do_sample"] is True for call in calls)
     assert all(call["temperature"] == config.train_temperature for call in calls)
     assert all(call["top_p"] == config.train_top_p for call in calls)
+    output = capsys.readouterr().out
+    assert "training_response_mining row_index=0" in output
+    assert "LLM_PROMPT" in output
+    assert "Question:\nWhich option is correct?" in output
+    assert "LLM_COMPLETION" in output
+    assert "Answer: A" in output
+    assert "classification=positive" in output
 
 
 def test_build_training_pairs_rejects_non_positive_generation_count() -> None:
