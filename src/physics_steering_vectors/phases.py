@@ -17,7 +17,7 @@ from physics_steering_vectors.config import ExperimentConfig  # Local: phase set
 from physics_steering_vectors.data import load_physics_splits  # Local: load benchmark rows. Global: benchmark setup.
 from physics_steering_vectors.evaluation import evaluate  # Local: score condition. Global: baseline/intervention measurement.
 from physics_steering_vectors.modeling import load_qwen_bundle  # Local: model setup. Global: shared runtime.
-from physics_steering_vectors.reporting import print_result_table  # Local: output table. Global: final comparison.
+from physics_steering_vectors.reporting import print_result_table, write_result_report  # Local: output table. Global: final comparison.
 from physics_steering_vectors.reproducibility import set_reproducibility  # Local: seed setup. Global: repeatability.
 from physics_steering_vectors.schemas import BenchmarkSplits, EvaluationResult, ModelBundle  # Local: typed phase boundaries. Global: readable pipeline.
 from physics_steering_vectors.steering import (  # Local: vector training/persistence. Global: intervention creation and preservation.
@@ -171,17 +171,20 @@ def phase_5_steering_sweep(
     return results  # Local: return all intervention scores. Global: feed report phase.
 
 
-def phase_6_report(results: list[EvaluationResult]) -> None:
+def phase_6_report(config: ExperimentConfig, results: list[EvaluationResult]) -> None:
     """Phase 6: report.
 
     Sources Used:
     - pandas DataFrame docs: https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html
 
     Local Function:
-    - Print sorted accuracy table.
+    - Print and save sorted accuracy table.
 
     Global Role:
-    - Shows whether steering improved physics performance.
+    - Shows and preserves whether steering improved physics performance.
     """
 
     print_result_table(results)  # Local: render table. Global: final experiment outcome.
+    markdown_path, csv_path = write_result_report(results, config.report_dir)  # Local: persist table. Global: preserve run output.
+    print(f"Saved report: {markdown_path}")  # Local: show human-readable artifact. Global: make report easy to find.
+    print(f"Saved report CSV: {csv_path}")  # Local: show machine-readable artifact. Global: support later analysis.

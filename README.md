@@ -110,7 +110,7 @@ max_test_examples: int | None = None
 ## Steering Vector Artifacts
 
 Each trained layer vector is saved after training and before multiplier evaluation. By default,
-artifacts are written under:
+vector artifacts are written under:
 
 ```text
 artifacts/steering_vectors/
@@ -120,6 +120,14 @@ These `.pt` files contain a versioned PyTorch payload with the vector's `layer_t
 CPU `layer_activations`, and run metadata. They are generated local artifacts and are ignored by
 Git. Use `load_steering_vector()` from `src/physics_steering_vectors/steering.py` to reconstruct a
 `SteeringVector` for later analysis or reuse.
+
+Final result tables are also saved locally as Markdown and CSV files under:
+
+```text
+artifacts/reports/
+```
+
+These report files are generated artifacts and are ignored by Git.
 
 ## Expected Output
 
@@ -143,6 +151,8 @@ The script prints:
 ```
 
 The real numbers will depend on the model, hardware, installed library versions, and benchmark run.
+The same table is saved to `artifacts/reports/latest_results.md` and
+`artifacts/reports/latest_results.csv`.
 
 ## Interpreting Results
 
@@ -202,6 +212,7 @@ baseline accuracy vs steered accuracy
 - Training negatives: model-generated responses whose extracted answer differs from the validation gold answer.
 - Training sampling: controlled by `train_generations_per_question`, `train_temperature`, and `train_top_p`.
 - Vector artifacts: saved under `steering_vector_dir`, which defaults to `artifacts/steering_vectors`.
+- Report artifacts: saved under `report_dir`, which defaults to `artifacts/reports`.
 - Evaluation decoding: deterministic by default through `do_sample=False`.
 - Activation collection: `activation_collection.py` mines and pairs generated validation responses for vector training.
 - Shared generation: `generation.py` owns model completion for both activation collection and evaluation.
@@ -326,6 +337,7 @@ Important fields:
 - `train_top_p`: nucleus sampling value used only while mining training responses.
 - `train_batch_size`: activation-training batch size passed to `train_steering_vector()`.
 - `steering_vector_dir`: directory for generated `.pt` steering-vector artifacts.
+- `report_dir`: directory for generated Markdown and CSV result reports.
 - `do_sample`: evaluation decoding mode, deterministic by default.
 
 ### `src/physics_steering_vectors/schemas.py`

@@ -52,7 +52,7 @@ def main() -> None:
         training_pairs,
     )
 
-    phase_6_report([baseline, *steered_results])  # Local: print comparison. Global: answer whether steering improved physics accuracy.
+    phase_6_report(config, [baseline, *steered_results])  # Local: print/save comparison. Global: answer whether steering improved physics accuracy.
 
 
 if __name__ == "__main__":  # Local: allow direct script execution. Global: supports simple local runs.

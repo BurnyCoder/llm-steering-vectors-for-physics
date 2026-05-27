@@ -51,4 +51,5 @@ class ExperimentConfig:
     multipliers: tuple[float, ...] = (0.5, 1.0, 1.5, 2.0)  # Local: steering strengths. Global: tests dose response.
     train_batch_size: int = 1  # Local: conservative activation batch. Global: reduces memory risk on small GPUs.
     steering_vector_dir: str = "artifacts/steering_vectors"  # Local: runtime vector artifact directory. Global: preserves trained interventions for later analysis.
+    report_dir: str = "artifacts/reports"  # Local: runtime report artifact directory. Global: preserves result tables after long runs.
     do_sample: bool = False  # Local: deterministic generation. Global: makes accuracy deltas easier to interpret.

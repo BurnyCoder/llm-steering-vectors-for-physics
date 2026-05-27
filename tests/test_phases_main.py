@@ -125,12 +125,20 @@ def test_phase_5_steering_sweep_trains_each_layer_and_evaluates_each_multiplier(
 
 def test_phase_6_report_delegates_to_reporting(monkeypatch) -> None:
     results = [EvaluationResult(label="baseline", correct=0, total=1, accuracy=0.0, records=[])]
-    calls: list[list[EvaluationResult]] = []
-    monkeypatch.setattr(phases, "print_result_table", lambda received: calls.append(received))
+    config = ExperimentConfig(report_dir="reports")
+    print_calls: list[list[EvaluationResult]] = []
+    write_calls: list[tuple[list[EvaluationResult], str]] = []
+    monkeypatch.setattr(phases, "print_result_table", lambda received: print_calls.append(received))
+    monkeypatch.setattr(
+        phases,
+        "write_result_report",
+        lambda received, report_dir: write_calls.append((received, report_dir)) or ("report.md", "report.csv"),
+    )
 
-    phases.phase_6_report(results)
+    phases.phase_6_report(config, results)
 
-    assert calls == [results]
+    assert print_calls == [results]
+    assert write_calls == [(results, "reports")]
 
 
 def test_main_orchestrates_all_phases(monkeypatch) -> None:
@@ -154,7 +162,7 @@ def test_main_orchestrates_all_phases(monkeypatch) -> None:
         "phase_5_steering_sweep",
         lambda config, bundle, splits, pairs: events.append(f"phase5:{bundle}:{splits}:{pairs}") or ["steered"],
     )
-    monkeypatch.setattr(main_module, "phase_6_report", lambda results: events.append(f"phase6:{results}"))
+    monkeypatch.setattr(main_module, "phase_6_report", lambda config, results: events.append(f"phase6:{config}:{results}"))
 
     main_module.main()
 
@@ -164,5 +172,5 @@ def test_main_orchestrates_all_phases(monkeypatch) -> None:
         "phase3:bundle:splits",
         "phase4:bundle:splits",
         "phase5:bundle:splits:pairs",
-        "phase6:['baseline', 'steered']",
+        "phase6:config:['baseline', 'steered']",
     ]

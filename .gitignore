@@ -11,3 +11,5 @@ wheels/
 
 # Generated experiment artifacts
 artifacts/steering_vectors/*.pt
+artifacts/reports/*.csv
+artifacts/reports/*.md
