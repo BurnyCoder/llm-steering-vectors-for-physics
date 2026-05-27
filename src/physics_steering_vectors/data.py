@@ -18,9 +18,11 @@ import requests  # Source: MMLU-Pro official prompt URL. Local: fetch prompt. Gl
 from datasets import load_dataset  # Source: HF Datasets docs. Local: load Hub dataset. Global: get MMLU-Pro rows.
 
 from physics_steering_vectors.config import ExperimentConfig  # Local: read dataset/prompt settings. Global: central protocol.
+from physics_steering_vectors.logging_utils import get_logger, log_text_block  # Local: data logs. Global: terminal audit trail.
 from physics_steering_vectors.schemas import BenchmarkSplits  # Local: return typed splits. Global: phase boundary.
 
 CHOICES = list("ABCDEFGHIJ")  # Source: MMLU-Pro 10-option format. Local: map option indices to letters. Global: score answer letters.
+logger = get_logger(__name__)
 
 
 def load_physics_splits(config: ExperimentConfig) -> BenchmarkSplits:
@@ -37,14 +39,18 @@ def load_physics_splits(config: ExperimentConfig) -> BenchmarkSplits:
     - Keeps validation for steering-vector construction and test for final evaluation.
     """
 
+    logger.info("Loading dataset dataset_id=%s subject=%s", config.dataset_id, config.subject)
     dataset = load_dataset(config.dataset_id)  # Source: HF Datasets docs. Local: load dataset dict. Global: fetch benchmark data.
     validation = _filter_subject(dataset["validation"], config.subject)  # Source: MMLU-Pro schema. Local: filter validation. Global: training contrast source.
     test = _filter_subject(dataset["test"], config.subject)  # Source: MMLU-Pro schema. Local: filter test. Global: held-out evaluation source.
+    logger.info("Filtered subject rows validation=%d test=%d", len(validation), len(test))
 
     if config.max_test_examples is not None:  # Local: enable smoke test. Global: quick validation before full run.
         test = test[: config.max_test_examples]  # Local: truncate test rows. Global: reduce initial runtime.
+        logger.info("Applied max_test_examples=%d resulting_test_rows=%d", config.max_test_examples, len(test))
 
     fewshot_prefix = build_fewshot_prefix(config, validation)  # Source: MMLU-Pro official prompt style. Local: build shared prompt prefix. Global: consistent eval prompting.
+    logger.debug("Built fewshot prefix chars=%d", len(fewshot_prefix))
     return BenchmarkSplits(validation=validation, test=test, fewshot_prefix=fewshot_prefix)  # Local: package data. Global: pass to phases.
 
 
@@ -90,12 +96,16 @@ def build_fewshot_prefix(config: ExperimentConfig, validation: list[dict[str, An
     - Gives every test question the same task framing and demonstrations.
     """
 
+    logger.info("Fetching initial prompt url=%s", config.initial_prompt_url)
     response = requests.get(config.initial_prompt_url, timeout=30)  # Source: MMLU-Pro repo prompt file. Local: fetch prompt text. Global: align with official eval style.
     response.raise_for_status()  # Source: requests API. Local: fail on download errors. Global: avoid silently using bad prompt.
 
     prefix = response.text.replace("{$}", config.subject).rstrip() + "\n\n"  # Source: MMLU-Pro prompt placeholder. Local: insert subject. Global: configure physics eval context.
-    for row in validation[: config.fewshot_k]:  # Source: MMLU-Pro few-shot style. Local: select examples. Global: stable demonstrations.
+    logger.debug("Initial prompt fetched chars=%d fewshot_k=%d", len(response.text), config.fewshot_k)
+    for shot_index, row in enumerate(validation[: config.fewshot_k]):  # Source: MMLU-Pro few-shot style. Local: select examples. Global: stable demonstrations.
+        logger.debug("Adding few-shot example shot_index=%d question_id=%s answer=%s", shot_index, row.get("question_id"), row.get("answer"))
         prefix += format_solution(row) + "\n\n"  # Local: add solved example. Global: condition model with answer format.
+    log_text_block(logger, config.log_full_text, "fewshot_prefix", prefix)
     return prefix  # Local: return reusable prefix. Global: shared by all eval rows.
 
 
@@ -169,7 +179,9 @@ def _filter_subject(split: Any, subject: str) -> list[dict[str, Any]]:
     - Makes this a physics-only experiment.
     """
 
-    return [_clean_row(row) for row in split if row["category"] == subject]  # Local: filter and clean. Global: isolate physics rows.
+    filtered = [_clean_row(row) for row in split if row["category"] == subject]  # Local: filter and clean. Global: isolate physics rows.
+    logger.debug("Filtered split subject=%s rows=%d", subject, len(filtered))
+    return filtered
 
 
 def _clean_row(row: dict[str, Any]) -> dict[str, Any]:

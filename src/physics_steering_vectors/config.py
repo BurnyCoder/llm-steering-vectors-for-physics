@@ -52,4 +52,6 @@ class ExperimentConfig:
     train_batch_size: int = 1  # Local: conservative activation batch. Global: reduces memory risk on small GPUs.
     steering_vector_dir: str = "artifacts/steering_vectors"  # Local: runtime vector artifact directory. Global: preserves trained interventions for later analysis.
     report_dir: str = "artifacts/reports"  # Local: runtime report artifact directory. Global: preserves result tables after long runs.
+    log_level: str = "DEBUG"  # Local: terminal verbosity. Global: make long experiment runs fully auditable by default.
+    log_full_text: bool = True  # Local: print raw prompts/responses. Global: preserve exact LLM and steering-vector inputs in logs.
     do_sample: bool = False  # Local: deterministic generation. Global: makes accuracy deltas easier to interpret.

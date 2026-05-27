@@ -12,6 +12,11 @@ Global Role:
 
 import re  # Local: regex answer matching. Global: score generated text against gold labels.
 
+from physics_steering_vectors.logging_utils import get_logger  # Local: extraction logs. Global: terminal audit trail.
+
+
+logger = get_logger(__name__)
+
 
 def extract_answer_letter(text: str) -> str | None:
     """Extract final answer A-J.
@@ -32,8 +37,11 @@ def extract_answer_letter(text: str) -> str | None:
         r"\b([A-J])\b(?!.*\b[A-J]\b)",  # Local: match final standalone option letter. Global: last-resort extraction.
     ]
 
+    logger.debug("Extracting answer letter text_chars=%d", len(text))
     for pattern in patterns:  # Local: try patterns in priority order. Global: maximize valid scored predictions.
         match = re.search(pattern, text, flags=re.DOTALL)  # Local: search completion. Global: convert free text to option letter.
         if match:  # Local: extraction succeeded. Global: avoid counting parseable answer as missing.
+            logger.debug("Extracted answer letter pattern=%s prediction=%s", pattern, match.group(1))
             return match.group(1)  # Local: return captured letter. Global: prediction for accuracy.
+    logger.debug("Failed to extract answer letter text_chars=%d", len(text))
     return None  # Local: no parseable answer. Global: treated as wrong in evaluation.

@@ -20,7 +20,11 @@ from physics_steering_vectors.answer_extraction import extract_answer_letter  # 
 from physics_steering_vectors.config import ExperimentConfig  # Local: read dataset/prompt settings. Global: central protocol.
 from physics_steering_vectors.data import build_training_prompt  # Local: build mining prompts. Global: preserve training input format.
 from physics_steering_vectors.generation import generate_completion  # Local: shared model generation. Global: align training mining with evaluation generation.
+from physics_steering_vectors.logging_utils import get_logger, log_text_block  # Local: raw prompt/response logs. Global: auditable mining.
 from physics_steering_vectors.schemas import ModelBundle  # Local: access runtime. Global: same model/tokenizer used throughout experiment.
+
+
+logger = get_logger(__name__)
 
 
 def build_training_pairs(
@@ -45,13 +49,25 @@ def build_training_pairs(
     if config.train_generations_per_question <= 0:  # Local: validate mining count. Global: avoid silently producing no training data.
         raise ValueError("train_generations_per_question must be positive.")
 
+    logger.info(
+        "Starting training-response mining rows=%d generations_per_question=%d temperature=%s top_p=%s",
+        len(rows),
+        config.train_generations_per_question,
+        config.train_temperature,
+        config.train_top_p,
+    )
+
     positives: list[str] = []  # Local: collect correct generated responses. Global: positive side for vector training.
     negatives: list[str] = []  # Local: collect incorrect generated responses. Global: negative side for vector training.
     unparsable = 0  # Local: count extraction misses. Global: audit mined data quality.
 
-    for row in tqdm(rows, desc="training_response_mining"):  # Local: iterate validation examples. Global: avoid test leakage.
+    for row_index, row in enumerate(tqdm(rows, desc="training_response_mining")):  # Local: iterate validation examples. Global: avoid test leakage.
+        question_id = row.get("question_id", row_index)
         prompt = build_training_prompt(row)  # Local: create question prompt. Global: actual model input for mined response.
-        for _ in range(config.train_generations_per_question):  # Local: sample retries. Global: obtain real correct and incorrect model outputs.
+        logger.debug("Mining row row_index=%d question_id=%s gold=%s prompt_chars=%d", row_index, question_id, row["answer"], len(prompt))
+        for generation_index in range(config.train_generations_per_question):  # Local: sample retries. Global: obtain real correct and incorrect model outputs.
+            context = f"training_response_mining row_index={row_index} question_id={question_id} generation_index={generation_index}"
+            log_text_block(logger, config.log_full_text, f"{context} LLM_PROMPT", prompt)
             completion = generate_completion(  # Local: unsteered sampled response. Global: same completion code path as evaluation.
                 config,
                 bundle,
@@ -59,23 +75,44 @@ def build_training_pairs(
                 do_sample=True,
                 temperature=config.train_temperature,
                 top_p=config.train_top_p,
+                log_context=context,
             )
-            classified = classify_generated_response(prompt, completion, row["answer"])  # Local: score completion. Global: route into activation class.
+            log_text_block(logger, config.log_full_text, f"{context} LLM_COMPLETION", completion)
+            classified = classify_generated_response_details(prompt, completion, row["answer"])  # Local: score completion. Global: route into activation class.
             if classified is None:  # Local: answer extraction failed. Global: do not train on unknown correctness.
                 unparsable += 1
+                logger.debug(
+                    "Classified mining response row_index=%d question_id=%s generation_index=%d gold=%s prediction=None classification=unparsable",
+                    row_index,
+                    question_id,
+                    generation_index,
+                    row["answer"],
+                )
                 continue
 
-            label, text = classified  # Local: unpack classification. Global: append actual model response only.
+            label, text, prediction = classified  # Local: unpack classification. Global: append actual model response only.
+            logger.debug(
+                "Classified mining response row_index=%d question_id=%s generation_index=%d gold=%s prediction=%s classification=%s text_chars=%d",
+                row_index,
+                question_id,
+                generation_index,
+                row["answer"],
+                prediction,
+                label,
+                len(text),
+            )
             if label == "positive":
                 positives.append(text)
             else:
                 negatives.append(text)
 
     pairs = pair_training_examples(config, positives, negatives)  # Local: adapt pools to steering-vectors tuple API. Global: training samples.
-    print(  # Local: show mining counts. Global: audit steering signal before vector training.
-        "Mined training responses: "
-        f"positives={len(positives)} negatives={len(negatives)} "
-        f"unparsable={unparsable} pairs={len(pairs)}"
+    logger.info(  # Local: show mining counts. Global: audit steering signal before vector training.
+        "Mined training responses: positives=%d negatives=%d unparsable=%d pairs=%d",
+        len(positives),
+        len(negatives),
+        unparsable,
+        len(pairs),
     )
     return pairs  # Local: return paired generated responses. Global: feeds steering-vector training phase.
 
@@ -94,12 +131,27 @@ def classify_generated_response(
     - Keeps steering-vector training examples limited to real, benchmark-scored model responses.
     """
 
+    detailed = classify_generated_response_details(prompt, completion, gold_answer)
+    if detailed is None:
+        return None
+
+    label, text, _prediction = detailed
+    return label, text
+
+
+def classify_generated_response_details(
+    prompt: str,
+    completion: str,
+    gold_answer: str,
+) -> tuple[str, str, str] | None:
+    """Classify a generated response and include the extracted prediction."""
+
     prediction = extract_answer_letter(completion)  # Local: parse generated final answer. Global: decide correctness class.
     if prediction is None:  # Local: extraction failed. Global: skip unknown-quality response.
         return None
 
     label = "positive" if prediction == gold_answer else "negative"  # Local: benchmark correctness. Global: vector contrast class.
-    return label, prompt + completion  # Local: full generated response text. Global: activation input for vector training.
+    return label, prompt + completion, prediction  # Local: full generated response text. Global: activation input for vector training.
 
 
 def pair_training_examples(
@@ -121,6 +173,7 @@ def pair_training_examples(
     if not negatives:  # Local: validate negative pool. Global: fail loudly before vector training.
         raise RuntimeError("No incorrect model-generated training responses were mined.")
 
+    logger.debug("Pairing training examples positives=%d negatives=%d seed=%d", len(positives), len(negatives), config.seed)
     shuffled_positives = list(positives)  # Local: avoid mutating caller list. Global: deterministic training tuple order.
     shuffled_negatives = list(negatives)  # Local: avoid mutating caller list. Global: deterministic training tuple order.
     rng = random.Random(config.seed)  # Local: seeded shuffle. Global: reproducible pair assembly.
@@ -128,4 +181,6 @@ def pair_training_examples(
     rng.shuffle(shuffled_negatives)
 
     pair_count = min(len(shuffled_positives), len(shuffled_negatives))  # Local: balance pools. Global: avoid synthetic fallbacks.
-    return list(zip(shuffled_positives[:pair_count], shuffled_negatives[:pair_count]))  # Source: steering-vectors tuple format. Local: final adapter. Global: training samples.
+    pairs = list(zip(shuffled_positives[:pair_count], shuffled_negatives[:pair_count]))  # Source: steering-vectors tuple format. Local: final adapter. Global: training samples.
+    logger.debug("Paired training examples pair_count=%d", pair_count)
+    return pairs

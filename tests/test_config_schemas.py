@@ -16,6 +16,8 @@ def test_experiment_config_defaults_capture_protocol_settings() -> None:
     assert config.multipliers == (0.5, 1.0, 1.5, 2.0)
     assert config.steering_vector_dir == "artifacts/steering_vectors"
     assert config.report_dir == "artifacts/reports"
+    assert config.log_level == "DEBUG"
+    assert config.log_full_text is True
 
 
 def test_experiment_config_is_frozen() -> None:

@@ -1,11 +1,13 @@
 from physics_steering_vectors import main as main_module
 from physics_steering_vectors import phases
 from physics_steering_vectors.config import ExperimentConfig
+from physics_steering_vectors.logging_utils import configure_logging
 from physics_steering_vectors.schemas import BenchmarkSplits, EvaluationResult, ModelBundle
 
 
-def test_phase_1_model_setup_seeds_loads_and_prints_hook(monkeypatch, capsys) -> None:
+def test_phase_1_model_setup_seeds_loads_and_logs_hook(monkeypatch, capsys) -> None:
     config = ExperimentConfig(seed=99)
+    configure_logging(config)
     bundle = ModelBundle(model=None, processor=None, tokenizer=None, layer_config={"decoder_block": "layers.{num}"})
     calls: list[tuple[str, object]] = []
 
@@ -17,7 +19,8 @@ def test_phase_1_model_setup_seeds_loads_and_prints_hook(monkeypatch, capsys) ->
     assert "Decoder hook template: layers.{num}" in capsys.readouterr().out
 
 
-def test_phase_2_benchmark_setup_loads_and_prints_split_sizes(monkeypatch, capsys) -> None:
+def test_phase_2_benchmark_setup_loads_and_logs_split_sizes(monkeypatch, capsys) -> None:
+    configure_logging(ExperimentConfig())
     splits = BenchmarkSplits(validation=[{}], test=[{}, {}], fewshot_prefix="prefix")
     monkeypatch.setattr(phases, "load_physics_splits", lambda config: splits)
 
@@ -27,7 +30,8 @@ def test_phase_2_benchmark_setup_loads_and_prints_split_sizes(monkeypatch, capsy
     assert "Test physics rows: 2" in output
 
 
-def test_phase_3_contrast_pair_setup_mines_and_prints_pair_count(monkeypatch, capsys) -> None:
+def test_phase_3_contrast_pair_setup_mines_and_logs_pair_count(monkeypatch, capsys) -> None:
+    configure_logging(ExperimentConfig())
     pairs = [("positive", "negative")]
     splits = BenchmarkSplits(validation=[{"row": 1}], test=[], fewshot_prefix="")
     bundle = ModelBundle(model=None, processor=None, tokenizer=None, layer_config={})
@@ -145,6 +149,7 @@ def test_main_orchestrates_all_phases(monkeypatch) -> None:
     events: list[str] = []
 
     monkeypatch.setattr(main_module, "ExperimentConfig", lambda: "config")
+    monkeypatch.setattr(main_module, "configure_logging", lambda config: events.append(f"configure:{config}"))
     monkeypatch.setattr(main_module, "phase_1_model_setup", lambda config: events.append(f"phase1:{config}") or "bundle")
     monkeypatch.setattr(main_module, "phase_2_benchmark_setup", lambda config: events.append(f"phase2:{config}") or "splits")
     monkeypatch.setattr(
@@ -167,6 +172,7 @@ def test_main_orchestrates_all_phases(monkeypatch) -> None:
     main_module.main()
 
     assert events == [
+        "configure:config",
         "phase1:config",
         "phase2:config",
         "phase3:bundle:splits",

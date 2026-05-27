@@ -13,6 +13,7 @@ Global Role:
 """
 
 from physics_steering_vectors.config import ExperimentConfig  # Local: construct protocol settings. Global: fixes the experiment definition.
+from physics_steering_vectors.logging_utils import configure_logging, get_logger  # Local: terminal logs. Global: auditable experiment runs.
 from physics_steering_vectors.phases import (  # Local: import named phase functions. Global: keep main readable.
     phase_1_model_setup,
     phase_2_benchmark_setup,
@@ -21,6 +22,9 @@ from physics_steering_vectors.phases import (  # Local: import named phase funct
     phase_5_steering_sweep,
     phase_6_report,
 )
+
+
+logger = get_logger(__name__)
 
 
 def main() -> None:
@@ -39,6 +43,9 @@ def main() -> None:
     """
 
     config = ExperimentConfig()  # Local: instantiate settings. Global: define exact model/data/sweep protocol.
+    configure_logging(config)  # Local: set terminal log level. Global: make prompts/responses visible during the run.
+    logger.info("Starting physics steering experiment")
+    logger.debug("Experiment config: %s", config)
 
     model_bundle = phase_1_model_setup(config)  # Local: load Qwen and hooks. Global: create model to steer and evaluate.
     benchmark_splits = phase_2_benchmark_setup(config)  # Local: load Physics rows. Global: define validation/test data.
@@ -53,6 +60,7 @@ def main() -> None:
     )
 
     phase_6_report(config, [baseline, *steered_results])  # Local: print/save comparison. Global: answer whether steering improved physics accuracy.
+    logger.info("Finished physics steering experiment")
 
 
 if __name__ == "__main__":  # Local: allow direct script execution. Global: supports simple local runs.
