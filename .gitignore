@@ -13,3 +13,4 @@ wheels/
 artifacts/steering_vectors/*.pt
 artifacts/reports/*.csv
 artifacts/reports/*.md
+artifacts/logs/*.log

@@ -129,6 +129,15 @@ artifacts/reports/
 
 These report files are generated artifacts and are ignored by Git.
 
+Full run logs are written to the terminal and to a local log file by default:
+
+```text
+artifacts/logs/latest.log
+```
+
+These logs include full prompts, completions, and steering-vector library inputs. They are generated
+artifacts and are ignored by Git.
+
 ## Expected Output
 
 The script prints:
@@ -213,7 +222,7 @@ baseline accuracy vs steered accuracy
 - Training sampling: controlled by `train_generations_per_question`, `train_temperature`, and `train_top_p`.
 - Vector artifacts: saved under `steering_vector_dir`, which defaults to `artifacts/steering_vectors`.
 - Report artifacts: saved under `report_dir`, which defaults to `artifacts/reports`.
-- Terminal logging: defaults to `DEBUG` and prints full prompts, completions, and steering-vector training text.
+- Logging: defaults to `DEBUG`, prints full prompts/completions/steering inputs, and writes the same stream to `log_file_path`.
 - Evaluation decoding: deterministic by default through `do_sample=False`.
 - Activation collection: `activation_collection.py` mines and pairs generated validation responses for vector training.
 - Shared generation: `generation.py` owns model completion for both activation collection and evaluation.
@@ -341,6 +350,7 @@ Important fields:
 - `report_dir`: directory for generated Markdown and CSV result reports.
 - `log_level`: terminal logging level, `DEBUG` by default.
 - `log_full_text`: whether full prompts, completions, and steering-vector library inputs are printed.
+- `log_file_path`: path for the generated full run log, `artifacts/logs/latest.log` by default.
 - `do_sample`: evaluation decoding mode, deterministic by default.
 
 ### `src/physics_steering_vectors/schemas.py`

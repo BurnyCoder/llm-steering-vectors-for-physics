@@ -9,31 +9,41 @@ Global Role:
 
 import logging
 import sys
+from pathlib import Path
 from typing import Any
 
 
 PACKAGE_LOGGER_NAME = "physics_steering_vectors"
 _HANDLER_MARKER = "_physics_steering_vectors_terminal_handler"
+_FILE_HANDLER_MARKER = "_physics_steering_vectors_file_handler"
 _LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 
 
 def configure_logging(config: Any) -> logging.Logger:
-    """Configure package logging for terminal output."""
+    """Configure package logging for terminal and optional file output."""
 
     level = parse_log_level(config.log_level)
     logger = logging.getLogger(PACKAGE_LOGGER_NAME)
     logger.setLevel(level)
     logger.propagate = False
 
-    handler = _find_terminal_handler(logger)
-    if handler is None:
-        handler = DynamicStdoutHandler()
-        setattr(handler, _HANDLER_MARKER, True)
-        logger.addHandler(handler)
+    formatter = logging.Formatter(_LOG_FORMAT)
+    terminal_handler = _find_marked_handler(logger, _HANDLER_MARKER)
+    if terminal_handler is None:
+        terminal_handler = DynamicStdoutHandler()
+        setattr(terminal_handler, _HANDLER_MARKER, True)
+        logger.addHandler(terminal_handler)
 
-    handler.setLevel(level)
-    handler.setFormatter(logging.Formatter(_LOG_FORMAT))
-    logger.debug("Configured terminal logging level=%s full_text=%s", logging.getLevelName(level), config.log_full_text)
+    terminal_handler.setLevel(level)
+    terminal_handler.setFormatter(formatter)
+
+    file_handler = configure_file_handler(logger, config.log_file_path, level, formatter)
+    logger.debug(
+        "Configured logging level=%s full_text=%s log_file_path=%s",
+        logging.getLevelName(level),
+        config.log_full_text,
+        getattr(file_handler, "baseFilename", None),
+    )
     return logger
 
 
@@ -54,6 +64,40 @@ def parse_log_level(level: str | int) -> int:
     if not isinstance(numeric, int):
         raise ValueError(f"Unsupported log level: {level}")
     return numeric
+
+
+def configure_file_handler(
+    logger: logging.Logger,
+    log_file_path: str | Path | None,
+    level: int,
+    formatter: logging.Formatter,
+) -> logging.Handler | None:
+    """Configure the package-owned file handler."""
+
+    existing = _find_marked_handler(logger, _FILE_HANDLER_MARKER)
+    if log_file_path is None:
+        if existing is not None:
+            logger.removeHandler(existing)
+            existing.close()
+        return None
+
+    path = Path(log_file_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    resolved_path = str(path)
+
+    if isinstance(existing, logging.FileHandler) and existing.baseFilename == str(path.resolve()):
+        handler = existing
+    else:
+        if existing is not None:
+            logger.removeHandler(existing)
+            existing.close()
+        handler = logging.FileHandler(resolved_path, mode="w", encoding="utf-8")
+        setattr(handler, _FILE_HANDLER_MARKER, True)
+        logger.addHandler(handler)
+
+    handler.setLevel(level)
+    handler.setFormatter(formatter)
+    return handler
 
 
 class DynamicStdoutHandler(logging.Handler):
@@ -100,10 +144,10 @@ def log_text_block(
     )
 
 
-def _find_terminal_handler(logger: logging.Logger) -> logging.Handler | None:
-    """Find the package-owned terminal handler, if configured."""
+def _find_marked_handler(logger: logging.Logger, marker: str) -> logging.Handler | None:
+    """Find a package-owned handler, if configured."""
 
     for handler in logger.handlers:
-        if getattr(handler, _HANDLER_MARKER, False):
+        if getattr(handler, marker, False):
             return handler
     return None

@@ -18,6 +18,7 @@ def test_experiment_config_defaults_capture_protocol_settings() -> None:
     assert config.report_dir == "artifacts/reports"
     assert config.log_level == "DEBUG"
     assert config.log_full_text is True
+    assert config.log_file_path == "artifacts/logs/latest.log"
 
 
 def test_experiment_config_is_frozen() -> None:
