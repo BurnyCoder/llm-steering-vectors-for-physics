@@ -254,6 +254,7 @@ loaded module names before training or applying steering vectors.
 │       ├── evaluation.py
 │       ├── generation.py
 │       ├── layers.py
+│       ├── logging_utils.py
 │       ├── main.py
 │       ├── modeling.py
 │       ├── phases.py
@@ -269,6 +270,7 @@ loaded module names before training or applying steering vectors.
 │   ├── test_evaluation.py
 │   ├── test_generation.py
 │   ├── test_layers.py
+│   ├── test_logging_utils.py
 │   ├── test_modeling.py
 │   ├── test_module_entrypoint.py
 │   ├── test_phases_main.py
@@ -312,8 +314,8 @@ Global role:
 
 Local function:
 - Contains unit tests for answer extraction, data formatting, generation helpers, layer inference,
-  model loading adapters, activation-pair assembly, evaluation, reporting, reproducibility,
-  steering-library integration, and top-level phase orchestration.
+  logging configuration, model loading adapters, activation-pair assembly, evaluation, reporting,
+  reproducibility, steering-library integration, and top-level phase orchestration.
 
 Global role:
 - Protects deterministic project logic without requiring model downloads, GPU access, or full
@@ -374,6 +376,14 @@ Local function:
 
 Global role:
 - Reduces avoidable randomness so baseline and steered comparisons are easier to interpret.
+
+### `src/physics_steering_vectors/logging_utils.py`
+
+Local function:
+- Configures package logging, optional run-log files, and delimited full-text prompt/completion blocks.
+
+Global role:
+- Makes long experiment runs auditable while keeping terminal and file logging behavior centralized.
 
 ### `src/physics_steering_vectors/layers.py`
 
@@ -518,7 +528,7 @@ steered_results = phase_5_steering_sweep(
     training_pairs,
 )
 
-phase_6_report([baseline, *steered_results])
+phase_6_report(config, [baseline, *steered_results])
 ```
 
 ## Sources Used
@@ -555,6 +565,7 @@ Keep the experiment modular:
 - Put generated-response mining and positive/negative pair assembly in `activation_collection.py`.
 - Put model loading in `modeling.py`.
 - Put shared model completion logic in `generation.py`; do not duplicate generation code in activation collection or evaluation modules.
+- Put logging setup and full-text logging helpers in `logging_utils.py`.
 - Put intervention training in `steering.py`.
 - Put benchmark scoring in `evaluation.py`.
 - Keep `main.py` as simple phase orchestration.
