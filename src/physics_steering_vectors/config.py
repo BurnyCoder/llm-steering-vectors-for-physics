@@ -54,4 +54,5 @@ class ExperimentConfig:
     report_dir: str = "artifacts/reports"  # Local: runtime report artifact directory. Global: preserves result tables after long runs.
     log_level: str = "DEBUG"  # Local: terminal verbosity. Global: make long experiment runs fully auditable by default.
     log_full_text: bool = True  # Local: print raw prompts/responses. Global: preserve exact LLM and steering-vector inputs in logs.
+    log_file_path: str | None = "artifacts/logs/latest.log"  # Local: optional run log path. Global: preserve terminal logs after long runs.
     do_sample: bool = False  # Local: deterministic generation. Global: makes accuracy deltas easier to interpret.
