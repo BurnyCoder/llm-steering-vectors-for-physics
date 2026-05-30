@@ -16,9 +16,10 @@ from pathlib import Path  # Local: normalize log-file paths. Global: create stab
 from typing import Any  # Local: accept config-like objects. Global: avoid coupling this utility to one dataclass.
 
 
-PACKAGE_LOGGER_NAME = "physics_steering_vectors"  # Local: package logger namespace. Global: one logging root for all modules.
-_HANDLER_MARKER = "_physics_steering_vectors_terminal_handler"  # Local: identify owned stdout handler. Global: avoid duplicate terminal logs.
-_FILE_HANDLER_MARKER = "_physics_steering_vectors_file_handler"  # Local: identify owned file handler. Global: safely reconfigure log files.
+PACKAGE_LOGGER_NAME = __package__ or __name__.partition(".")[0]  # Local: infer package logger namespace. Global: one logging root for all modules.
+_HANDLER_MARKER_PREFIX = f"_{PACKAGE_LOGGER_NAME.replace('.', '_')}"  # Local: namespace handler markers. Global: avoid marker collisions.
+_HANDLER_MARKER = f"{_HANDLER_MARKER_PREFIX}_terminal_handler"  # Local: identify owned stdout handler. Global: avoid duplicate terminal logs.
+_FILE_HANDLER_MARKER = f"{_HANDLER_MARKER_PREFIX}_file_handler"  # Local: identify owned file handler. Global: safely reconfigure log files.
 _LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"  # Local: uniform line format. Global: readable multi-phase run logs.
 
 
