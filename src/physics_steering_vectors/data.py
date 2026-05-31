@@ -12,6 +12,7 @@ Global Role:
 - Defines the benchmark data used to train steering vectors and test physics accuracy.
 """
 
+from functools import lru_cache  # Local: avoid refetching initial prompt across phases. Global: keep eval/mining prompt source shared.
 from typing import Any  # Local: type dataset rows. Global: keep external data shape flexible.
 
 import requests  # Source: MMLU-Pro official prompt URL. Local: fetch prompt. Global: match benchmark style.
@@ -70,7 +71,7 @@ def build_eval_prompt(row: dict[str, Any], fewshot_prefix: str) -> str:
     return f"{fewshot_prefix}{format_question(row)}\nAnswer: Let's think step by step."  # Local: final prompt. Global: benchmark input.
 
 
-def build_training_prompt(row: dict[str, Any]) -> str:
+def build_training_prompt(row: dict[str, Any], initial_prompt: str) -> str:
     """Build one prompt used to mine a training response.
 
     Local Function:
@@ -80,7 +81,7 @@ def build_training_prompt(row: dict[str, Any]) -> str:
     - Ensures training pairs contain model-generated answers, not label-edited dataset solutions.
     """
 
-    return f"{format_question(row)}\nAnswer: Let's think step by step."  # Local: final prompt. Global: model input for mined training response.
+    return f"{initial_prompt}\n\n{format_question(row)}\nAnswer: Let's think step by step."  # Local: final prompt. Global: model input for mined training response.
 
 
 def build_fewshot_prefix(config: ExperimentConfig, validation: list[dict[str, Any]]) -> str:
@@ -96,17 +97,30 @@ def build_fewshot_prefix(config: ExperimentConfig, validation: list[dict[str, An
     - Gives every test question the same task framing and demonstrations.
     """
 
-    logger.info("Fetching initial prompt url=%s", config.initial_prompt_url)
-    response = requests.get(config.initial_prompt_url, timeout=30)  # Source: MMLU-Pro repo prompt file. Local: fetch prompt text. Global: align with official eval style.
-    response.raise_for_status()  # Source: requests API. Local: fail on download errors. Global: avoid silently using bad prompt.
-
-    prefix = response.text.replace("{$}", config.subject).rstrip() + "\n\n"  # Source: MMLU-Pro prompt placeholder. Local: insert subject. Global: configure physics eval context.
-    logger.debug("Initial prompt fetched chars=%d fewshot_k=%d", len(response.text), config.fewshot_k)
+    prefix = fetch_initial_prompt(config) + "\n\n"  # Source: MMLU-Pro prompt placeholder. Local: insert subject. Global: configure physics eval context.
+    logger.debug("Initial prompt ready fewshot_k=%d", config.fewshot_k)
     for shot_index, row in enumerate(validation[: config.fewshot_k]):  # Source: MMLU-Pro few-shot style. Local: select examples. Global: stable demonstrations.
         logger.debug("Adding few-shot example shot_index=%d question_id=%s answer=%s", shot_index, row.get("question_id"), row.get("answer"))
         prefix += format_solution(row) + "\n\n"  # Local: add solved example. Global: condition model with answer format.
     log_text_block(logger, config.log_full_text, "fewshot_prefix", prefix)
     return prefix  # Local: return reusable prefix. Global: shared by all eval rows.
+
+
+def fetch_initial_prompt(config: ExperimentConfig) -> str:
+    """Fetch and subject-format the official MMLU-Pro initial prompt."""
+
+    return _fetch_initial_prompt(config.initial_prompt_url, config.subject)  # Local: cache by protocol-affecting prompt URL and subject. Global: share prompt across phases.
+
+
+@lru_cache(maxsize=None)
+def _fetch_initial_prompt(initial_prompt_url: str, subject: str) -> str:
+    """Fetch one official initial prompt by URL and subject."""
+
+    logger.info("Fetching initial prompt url=%s", initial_prompt_url)
+    response = requests.get(initial_prompt_url, timeout=30)  # Source: MMLU-Pro repo prompt file. Local: fetch prompt text. Global: align eval and mining prompt source.
+    response.raise_for_status()  # Source: requests API. Local: fail on download errors. Global: avoid silently using bad prompt.
+    logger.debug("Initial prompt fetched chars=%d", len(response.text))
+    return response.text.replace("{$}", subject).rstrip()  # Source: MMLU-Pro initial_prompt.txt placeholder {$}. Local: insert subject. Global: one instruction for eval/mining.
 
 
 def format_solution(row: dict[str, Any]) -> str:

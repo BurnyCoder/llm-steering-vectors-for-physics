@@ -39,10 +39,12 @@ def test_format_cot_normalizes_answer_prefix_once() -> None:
 
 def test_format_solution_and_prompts_compose_question_answer_text() -> None:
     row = make_row()
+    initial_prompt = 'The following are multiple choice questions (with answers) about physics. Finish with "the answer is (X)".'
 
     assert data.format_solution(row).startswith("Question:\nWhat is the force?")
     assert data.format_solution(row).endswith("The answer is (B).")
-    assert data.build_training_prompt(row).endswith("\nAnswer: Let's think step by step.")
+    assert data.build_training_prompt(row, initial_prompt).startswith("The following are multiple choice questions")
+    assert data.build_training_prompt(row, initial_prompt).endswith("\nAnswer: Let's think step by step.")
     assert data.build_eval_prompt(row, "PREFIX\n\n").startswith("PREFIX\n\nQuestion:")
 
 
@@ -84,6 +86,7 @@ def test_build_fewshot_prefix_fetches_prompt_and_appends_solutions(monkeypatch: 
 
     monkeypatch.setattr(data.requests, "get", fake_get)
     config = ExperimentConfig(initial_prompt_url="https://example.test/prompt.txt", fewshot_k=1)
+    data._fetch_initial_prompt.cache_clear()
 
     prefix = data.build_fewshot_prefix(config, [make_row(), make_row(question_id=2)])
 
@@ -91,6 +94,30 @@ def test_build_fewshot_prefix_fetches_prompt_and_appends_solutions(monkeypatch: 
     assert prefix.startswith("These are physics questions.\n\n")
     assert prefix.count("Question:") == 1
     assert prefix.endswith("\n\n")
+
+
+def test_fetch_initial_prompt_formats_subject_and_caches(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeResponse:
+        text = "These are {$} questions."
+
+        def raise_for_status(self) -> None:
+            calls["raised"] = calls.get("raised", 0) + 1
+
+    calls: dict[str, object] = {"count": 0}
+
+    def fake_get(url: str, timeout: int) -> FakeResponse:
+        calls["count"] = int(calls["count"]) + 1
+        calls["url"] = url
+        calls["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(data.requests, "get", fake_get)
+    config = ExperimentConfig(initial_prompt_url="https://example.test/cached-prompt.txt", subject="astronomy")
+    data._fetch_initial_prompt.cache_clear()
+
+    assert data.fetch_initial_prompt(config) == "These are astronomy questions."
+    assert data.fetch_initial_prompt(config) == "These are astronomy questions."
+    assert calls == {"count": 1, "url": "https://example.test/cached-prompt.txt", "timeout": 30, "raised": 1}
 
 
 def test_load_physics_splits_filters_rows_caps_test_and_builds_prefix(monkeypatch: pytest.MonkeyPatch) -> None:

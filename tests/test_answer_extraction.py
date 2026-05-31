@@ -8,6 +8,7 @@ from physics_steering_vectors.answer_extraction import extract_answer_letter
     [
         ("After the derivation, the answer is (C).", "C"),
         ("Answer: J\n", "J"),
+        ("The final answer: A", "A"),
         ("I considered A and B, but the final choice is D", "D"),
         ("The option is 3, with no final letter.", None),
     ],

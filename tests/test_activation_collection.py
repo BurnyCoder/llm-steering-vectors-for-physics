@@ -72,6 +72,7 @@ def test_build_training_pairs_mines_generated_positive_and_negative_responses(mo
         return next(completions)
 
     monkeypatch.setattr(activation_collection, "generate_completion", fake_generate_completion)
+    monkeypatch.setattr(activation_collection, "fetch_initial_prompt", lambda config: "Initial prompt.")
     monkeypatch.setattr(activation_collection, "tqdm", lambda iterable, desc: iterable)
 
     pairs = build_training_pairs(config, bundle=object(), rows=rows)
