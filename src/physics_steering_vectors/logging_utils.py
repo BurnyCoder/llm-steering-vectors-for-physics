@@ -32,15 +32,7 @@ def configure_logging(config: Any) -> logging.Logger:
     logger.propagate = False  # Local: prevent parent logger duplication. Global: keep terminal/file output single-counted.
 
     formatter = logging.Formatter(_LOG_FORMAT)  # Source: Python logging Formatter. Local: build shared formatter. Global: stable log schema.
-    terminal_handler = _find_marked_handler(logger, _HANDLER_MARKER)  # Local: reuse stdout handler. Global: idempotent setup.
-    if terminal_handler is None:  # Local: first logging configuration. Global: install terminal output once.
-        terminal_handler = DynamicStdoutHandler()  # Local: defer stdout lookup until emit. Global: support capture-aware terminals.
-        setattr(terminal_handler, _HANDLER_MARKER, True)  # Local: mark ownership. Global: distinguish package handler from user handlers.
-        logger.addHandler(terminal_handler)  # Local: attach terminal output. Global: make experiment progress visible.
-
-    terminal_handler.setLevel(level)  # Local: apply current verbosity. Global: keep reconfiguration effective.
-    terminal_handler.setFormatter(formatter)  # Local: apply shared format. Global: match file and terminal logs.
-
+    configure_terminal_handler(logger, level, formatter)  # Local: configure terminal output. Global: keep setup idempotent.
     file_handler = configure_file_handler(logger, config.log_file_path, level, formatter)  # Local: optional persistent log. Global: preserve long-run output.
     logger.debug(
         "Configured logging level=%s full_text=%s log_file_path=%s",
@@ -68,6 +60,24 @@ def parse_log_level(level: str | int) -> int:
     if not isinstance(numeric, int):  # Local: reject unknown names. Global: fail fast on misconfigured runs.
         raise ValueError(f"Unsupported log level: {level}")  # Local: explain bad setting. Global: avoid silent logging gaps.
     return numeric  # Local: return standard integer level. Global: feed logger/handler configuration.
+
+
+def configure_terminal_handler(
+    logger: logging.Logger,
+    level: int,
+    formatter: logging.Formatter,
+) -> logging.Handler:
+    """Configure the package-owned terminal handler."""
+
+    terminal_handler = _find_marked_handler(logger, _HANDLER_MARKER)  # Local: reuse stdout handler. Global: idempotent setup.
+    if terminal_handler is None:  # Local: first logging configuration. Global: install terminal output once.
+        terminal_handler = DynamicStdoutHandler()  # Local: defer stdout lookup until emit. Global: support capture-aware terminals.
+        setattr(terminal_handler, _HANDLER_MARKER, True)  # Local: mark ownership. Global: distinguish package handler from user handlers.
+        logger.addHandler(terminal_handler)  # Local: attach terminal output. Global: make experiment progress visible.
+
+    terminal_handler.setLevel(level)  # Local: apply current verbosity. Global: keep reconfiguration effective.
+    terminal_handler.setFormatter(formatter)  # Local: apply shared format. Global: match file and terminal logs.
+    return terminal_handler  # Local: expose active terminal handler. Global: support direct tests and future diagnostics.
 
 
 def configure_file_handler(
