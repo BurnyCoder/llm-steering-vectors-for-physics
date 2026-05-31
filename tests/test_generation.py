@@ -1,5 +1,5 @@
 from contextlib import AbstractContextManager
-from types import TracebackType
+from types import SimpleNamespace, TracebackType
 from typing import Any
 
 import torch
@@ -10,8 +10,8 @@ from physics_steering_vectors.schemas import ModelBundle
 
 
 class FakeBatch(dict[str, torch.Tensor]):
-    def __init__(self) -> None:
-        super().__init__({"input_ids": torch.tensor([[101, 102]])})
+    def __init__(self, input_ids: list[int] | None = None) -> None:
+        super().__init__({"input_ids": torch.tensor([input_ids or [101, 102]])})
         self.moved_to: torch.device | None = None
 
     def to(self, device: torch.device) -> "FakeBatch":
@@ -20,33 +20,68 @@ class FakeBatch(dict[str, torch.Tensor]):
 
 
 class FakeTokenizer:
+    chat_template = None
     pad_token_id = 0
     eos_token_id = 2
 
-    def __init__(self) -> None:
+    def __init__(self, decode_text: str = "decoded completion") -> None:
         self.batch = FakeBatch()
+        self.decode_text = decode_text
         self.decoded_ids: list[int] | None = None
+        self.raw_prompt: str | None = None
 
     def __call__(self, prompt: str, return_tensors: str) -> FakeBatch:
         assert prompt == "prompt"
         assert return_tensors == "pt"
+        self.raw_prompt = prompt
         return self.batch
 
     def decode(self, token_ids: torch.Tensor, skip_special_tokens: bool) -> str:
         assert skip_special_tokens is True
         self.decoded_ids = token_ids.tolist()
-        return "decoded completion"
+        return self.decode_text
+
+
+class FakeChatTokenizer(FakeTokenizer):
+    chat_template = "chat template"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.batch = FakeBatch([301, 302, 303])
+        self.chat_messages: list[dict[str, str]] | None = None
+        self.chat_kwargs: dict[str, object] | None = None
+
+    def apply_chat_template(
+        self,
+        messages: list[dict[str, str]],
+        tokenize: bool,
+        add_generation_prompt: bool = False,
+        continue_final_message: bool = False,
+        return_dict: bool = False,
+        return_tensors: str = "",
+    ) -> FakeBatch:
+        assert tokenize is True
+        assert return_dict is True
+        assert return_tensors == "pt"
+        self.chat_messages = messages
+        self.chat_kwargs = {
+            "add_generation_prompt": add_generation_prompt,
+            "continue_final_message": continue_final_message,
+        }
+        return self.batch
 
 
 class FakeModel:
     device = torch.device("cpu")
 
-    def __init__(self) -> None:
+    def __init__(self, generation_config: Any | None = None) -> None:
         self.generation_kwargs: dict[str, Any] | None = None
+        self.generation_config = generation_config
 
     def generate(self, **kwargs: Any) -> torch.Tensor:
         self.generation_kwargs = kwargs
-        return torch.tensor([[101, 102, 201, 202]])
+        suffix = torch.tensor([[201, 202]])
+        return torch.cat([kwargs["input_ids"], suffix], dim=1)
 
 
 def make_bundle(model: FakeModel, tokenizer: FakeTokenizer) -> ModelBundle:
@@ -73,6 +108,55 @@ def test_generate_completion_decodes_only_new_tokens() -> None:
     assert model.generation_kwargs["do_sample"] is False
     assert model.generation_kwargs["pad_token_id"] == 0
     assert model.generation_kwargs["eos_token_id"] == 2
+    assert model.generation_kwargs["stop_strings"] == ["\nQuestion:", "\nHuman:", "\nHumanity:", "\nAssistant:"]
+    assert model.generation_kwargs["tokenizer"] is tokenizer
+
+
+def test_generate_completion_uses_chat_template_when_available() -> None:
+    model = FakeModel()
+    tokenizer = FakeChatTokenizer()
+
+    generate_completion(ExperimentConfig(), make_bundle(model, tokenizer), "prompt")
+
+    assert tokenizer.raw_prompt is None
+    assert tokenizer.chat_messages == [{"role": "user", "content": "prompt"}]
+    assert tokenizer.chat_kwargs == {"add_generation_prompt": True, "continue_final_message": False}
+    assert tokenizer.batch.moved_to == torch.device("cpu")
+    assert model.generation_kwargs is not None
+    assert model.generation_kwargs["input_ids"].tolist() == [[301, 302, 303]]
+
+
+def test_generate_completion_continues_mmlu_answer_prefill_with_chat_template() -> None:
+    model = FakeModel()
+    tokenizer = FakeChatTokenizer()
+    prompt = "Question:\nWhat is 2+2?\nAnswer: Let's think step by step."
+
+    generate_completion(ExperimentConfig(), make_bundle(model, tokenizer), prompt)
+
+    assert tokenizer.chat_messages == [
+        {"role": "user", "content": "Question:\nWhat is 2+2?"},
+        {"role": "assistant", "content": "Answer: Let's think step by step."},
+    ]
+    assert tokenizer.chat_kwargs == {"add_generation_prompt": False, "continue_final_message": True}
+
+
+def test_generate_completion_preserves_model_generation_eos_list() -> None:
+    model = FakeModel(generation_config=SimpleNamespace(eos_token_id=[151645, 151643]))
+    tokenizer = FakeTokenizer()
+
+    generate_completion(ExperimentConfig(), make_bundle(model, tokenizer), "prompt")
+
+    assert model.generation_kwargs is not None
+    assert model.generation_kwargs["eos_token_id"] == [151645, 151643]
+
+
+def test_generate_completion_strips_generated_stop_suffix() -> None:
+    model = FakeModel()
+    tokenizer = FakeTokenizer(decode_text="The answer is (A).\nQuestion:")
+
+    text = generate_completion(ExperimentConfig(), make_bundle(model, tokenizer), "prompt")
+
+    assert text == "The answer is (A)."
 
 
 def test_generate_completion_accepts_sampling_overrides() -> None:

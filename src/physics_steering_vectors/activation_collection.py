@@ -18,7 +18,7 @@ from tqdm import tqdm  # Local: progress bar for mining. Global: visible long-ru
 
 from physics_steering_vectors.answer_extraction import extract_answer_letter  # Local: score mined completions. Global: separate positive/negative pools.
 from physics_steering_vectors.config import ExperimentConfig  # Local: read dataset/prompt settings. Global: central protocol.
-from physics_steering_vectors.data import build_training_prompt  # Local: build mining prompts. Global: preserve training input format.
+from physics_steering_vectors.data import build_training_prompt, fetch_initial_prompt  # Local: build mining prompts. Global: preserve training input format.
 from physics_steering_vectors.generation import generate_completion  # Local: shared model generation. Global: align training mining with evaluation generation.
 from physics_steering_vectors.logging_utils import get_logger, log_text_block  # Local: raw prompt/response logs. Global: auditable mining.
 from physics_steering_vectors.schemas import ModelBundle  # Local: access runtime. Global: same model/tokenizer used throughout experiment.
@@ -60,10 +60,11 @@ def build_training_pairs(
     positives: list[str] = []  # Local: collect correct generated responses. Global: positive side for vector training.
     negatives: list[str] = []  # Local: collect incorrect generated responses. Global: negative side for vector training.
     unparsable = 0  # Local: count extraction misses. Global: audit mined data quality.
+    initial_prompt = fetch_initial_prompt(config)  # Source: config.initial_prompt_url. Local: share official answer-format instruction. Global: align mining with evaluation prompt source.
 
     for row_index, row in enumerate(tqdm(rows, desc="training_response_mining")):  # Local: iterate validation examples. Global: avoid test leakage.
         question_id = row.get("question_id", row_index)
-        prompt = build_training_prompt(row)  # Local: create question prompt. Global: actual model input for mined response.
+        prompt = build_training_prompt(row, initial_prompt)  # Local: create question prompt. Global: actual model input for mined response.
         logger.debug("Mining row row_index=%d question_id=%s gold=%s prompt_chars=%d", row_index, question_id, row["answer"], len(prompt))
         for generation_index in range(config.train_generations_per_question):  # Local: sample retries. Global: obtain real correct and incorrect model outputs.
             context = f"training_response_mining row_index={row_index} question_id={question_id} generation_index={generation_index}"
