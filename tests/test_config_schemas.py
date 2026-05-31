@@ -12,6 +12,8 @@ def test_experiment_config_defaults_capture_protocol_settings() -> None:
     assert config.model_id == "Qwen/Qwen2.5-0.5B-Instruct"
     assert config.dataset_id == "TIGER-Lab/MMLU-Pro"
     assert config.subject == "physics"
+    assert config.fewshot_k == 0
+    assert config.max_test_examples == 5
     assert config.layer_sweep == (6, 12, 18)
     assert config.multipliers == (0.5, 1.0, 1.5, 2.0)
     assert config.steering_vector_dir == "artifacts/steering_vectors"

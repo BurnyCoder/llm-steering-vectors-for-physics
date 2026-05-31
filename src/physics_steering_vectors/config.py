@@ -40,9 +40,9 @@ class ExperimentConfig:
     )
 
     seed: int = 0  # Local: deterministic RNG seed. Global: repeatable baseline/steered comparison.
-    fewshot_k: int = 5  # Local: number of validation examples in prompt. Global: matches official MMLU-Pro CoT style.
-    max_new_tokens: int = 512  # Local: cap generation length. Global: limits runaway small-model CoT loops.
-    max_test_examples: int | None = None  # Local: optional smoke-test cap. Global: full benchmark when None.
+    fewshot_k: int = 0  # Local: number of validation examples in prompt. Global: use zero-shot CoT for steering/eval parity.
+    max_new_tokens: int = 16384  # Local: allow 4x the 4096-token response budget. Global: reduce truncation of verbose physics completions.
+    max_test_examples: int | None = 5  # Local: smoke-test cap. Global: restore None for full benchmark runs.
     train_generations_per_question: int = 4  # Local: sampled attempts per validation row. Global: mine real correct/incorrect response pools.
     train_temperature: float = 0.8  # Local: diversify training generations. Global: improve odds of mixed correct/incorrect responses.
     train_top_p: float = 0.95  # Local: nucleus sampling for training generations. Global: keep sampled mining bounded but varied.
