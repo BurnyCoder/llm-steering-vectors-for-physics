@@ -531,31 +531,6 @@ steered_results = phase_5_steering_sweep(
 phase_6_report(config, [baseline, *steered_results])
 ```
 
-## Sources Used
-
-Model and model loading:
-
-- Qwen2.5 model card: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
-- Transformers Qwen2 docs: https://huggingface.co/docs/transformers/model_doc/qwen2
-
-Benchmark:
-
-- MMLU-Pro dataset card: https://huggingface.co/datasets/TIGER-Lab/MMLU-Pro
-- MMLU-Pro official repo: https://github.com/TIGER-AI-Lab/MMLU-Pro
-
-Steering:
-
-- steering-vectors basic usage: https://steering-vectors.github.io/steering-vectors/basic_usage.html
-- train_steering_vector API: https://steering-vectors.github.io/steering-vectors/api/train_steering_vector.html
-- SteeringVector API: https://steering-vectors.github.io/steering-vectors/api/steering_vector.html
-
-Python/data tooling:
-
-- Hugging Face Datasets loading docs: https://huggingface.co/docs/datasets/en/loading
-- PyTorch reproducibility notes: https://pytorch.org/docs/stable/notes/randomness.html
-- pandas DataFrame docs: https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html
-- Python `__main__` docs: https://docs.python.org/3/library/__main__.html
-
 ## Development Notes
 
 Keep the experiment modular:
