@@ -23,6 +23,19 @@ def test_configure_logging_prints_to_terminal_file_and_reuses_handlers(capsys, t
     assert file_output.count("second message") == 1
 
 
+def test_configure_logging_expands_run_timestamp_in_log_path(tmp_path) -> None:
+    config = ExperimentConfig(
+        log_level="INFO",
+        log_file_path=str(tmp_path / "run_{run_timestamp}.log"),
+        run_timestamp="20260612_010203_456789",
+    )
+    logger = configure_logging(config)
+
+    logger.info("timestamped message")
+
+    assert "timestamped message" in (tmp_path / "run_20260612_010203_456789.log").read_text(encoding="utf-8")
+
+
 def test_parse_log_level_rejects_unknown_level() -> None:
     with pytest.raises(ValueError, match="Unsupported log level"):
         parse_log_level("NOPE")

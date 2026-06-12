@@ -132,7 +132,7 @@ These report files are generated artifacts and are ignored by Git.
 Full run logs are written to the terminal and to a local log file by default:
 
 ```text
-artifacts/logs/latest.log
+artifacts/logs/run_<run_timestamp>.log
 ```
 
 These logs include full prompts, completions, and steering-vector library inputs. They are generated
@@ -160,8 +160,9 @@ The script prints:
 ```
 
 The real numbers will depend on the model, hardware, installed library versions, and benchmark run.
-The same table is saved to `artifacts/reports/latest_results.md` and
-`artifacts/reports/latest_results.csv`.
+The same table is saved to timestamped Markdown and CSV files under `artifacts/reports/`, such as
+`artifacts/reports/results_20260612_010203_456789.md` and
+`artifacts/reports/results_20260612_010203_456789.csv`.
 
 ## Interpreting Results
 
@@ -347,12 +348,14 @@ Important fields:
 - `train_generations_per_question`: sampled unsteered completions to mine per validation row.
 - `train_temperature`: sampling temperature used only while mining training responses.
 - `train_top_p`: nucleus sampling value used only while mining training responses.
+- `run_timestamp`: timestamp used in default generated log and report filenames.
 - `train_batch_size`: activation-training batch size passed to `train_steering_vector()`.
 - `steering_vector_dir`: directory for generated `.pt` steering-vector artifacts.
 - `report_dir`: directory for generated Markdown and CSV result reports.
+- `report_stem`: filename stem for generated reports, `results_{run_timestamp}` by default.
 - `log_level`: terminal logging level, `DEBUG` by default.
 - `log_full_text`: whether full prompts, completions, and steering-vector library inputs are printed.
-- `log_file_path`: path for the generated full run log, `artifacts/logs/latest.log` by default.
+- `log_file_path`: path for the generated full run log, `artifacts/logs/run_{run_timestamp}.log` by default.
 - `do_sample`: evaluation decoding mode, deterministic by default.
 
 ### `src/physics_steering_vectors/schemas.py`

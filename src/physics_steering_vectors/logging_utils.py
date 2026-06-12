@@ -33,7 +33,8 @@ def configure_logging(config: Any) -> logging.Logger:
 
     formatter = logging.Formatter(_LOG_FORMAT)  # Source: Python logging Formatter. Local: build shared formatter. Global: stable log schema.
     configure_terminal_handler(logger, level, formatter)  # Local: configure terminal output. Global: keep setup idempotent.
-    file_handler = configure_file_handler(logger, config.log_file_path, level, formatter)  # Local: optional persistent log. Global: preserve long-run output.
+    log_file_path = resolve_run_artifact(config, config.log_file_path)  # Local: expand timestamp placeholders. Global: keep run logs distinct.
+    file_handler = configure_file_handler(logger, log_file_path, level, formatter)  # Local: optional persistent log. Global: preserve long-run output.
     logger.debug(
         "Configured logging level=%s full_text=%s log_file_path=%s",
         logging.getLevelName(level),
@@ -112,6 +113,15 @@ def configure_file_handler(
     handler.setLevel(level)  # Local: apply configured verbosity. Global: keep file and terminal thresholds aligned.
     handler.setFormatter(formatter)  # Local: apply shared format. Global: consistent log parsing.
     return handler  # Local: expose active file handler. Global: include resolved path in debug output.
+
+
+def resolve_run_artifact(config: Any, value: str | Path | None) -> str | Path | None:
+    """Resolve run artifact placeholders for config objects that support them."""
+
+    formatter = getattr(config, "format_run_artifact", None)
+    if callable(formatter) and isinstance(value, str):
+        return formatter(value)
+    return value
 
 
 class DynamicStdoutHandler(logging.Handler):

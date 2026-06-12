@@ -15,6 +15,7 @@ from pathlib import Path  # Local: create report artifact paths. Global: persist
 
 import pandas as pd  # Local: tabulate result rows. Global: readable final comparison.
 
+from physics_steering_vectors.config import make_run_timestamp  # Local: timestamp default report names. Global: avoid artifact overwrites.
 from physics_steering_vectors.logging_utils import get_logger, log_text_block  # Local: report logs. Global: terminal audit trail.
 from physics_steering_vectors.schemas import EvaluationResult  # Local: typed result input. Global: report phase contract.
 
@@ -76,7 +77,7 @@ def print_result_table(results: list[EvaluationResult]) -> None:
 def write_result_report(
     results: list[EvaluationResult],
     report_dir: str | Path,
-    stem: str = "latest_results",
+    stem: str | None = None,
 ) -> tuple[Path, Path]:
     """Save accuracy tables to Markdown and CSV files.
 
@@ -91,13 +92,14 @@ def write_result_report(
     - Preserves experiment results after terminal output scrolls away.
     """
 
-    logger.info("Writing result report report_dir=%s stem=%s results=%d", report_dir, stem, len(results))
+    resolved_stem = stem if stem is not None else f"results_{make_run_timestamp()}"  # Local: default to a unique filename. Global: preserve past reports.
+    logger.info("Writing result report report_dir=%s stem=%s results=%d", report_dir, resolved_stem, len(results))
     frame = build_result_frame(results)  # Local: use same table as terminal output. Global: keep printed/saved reports identical.
     output_dir = Path(report_dir)  # Local: accept config strings or caller Paths. Global: configurable artifact location.
     output_dir.mkdir(parents=True, exist_ok=True)  # Local: create artifact directory lazily. Global: runs work from a clean checkout.
 
-    markdown_path = output_dir / f"{stem}.md"  # Local: human-readable report path. Global: durable experiment artifact.
-    csv_path = output_dir / f"{stem}.csv"  # Local: tabular report path. Global: enables later analysis.
+    markdown_path = output_dir / f"{resolved_stem}.md"  # Local: human-readable report path. Global: durable experiment artifact.
+    csv_path = output_dir / f"{resolved_stem}.csv"  # Local: tabular report path. Global: enables later analysis.
     table_text = frame.to_string(index=False)  # Local: render exact printed table. Global: keep saved Markdown dependency-free.
 
     markdown_path.write_text(  # Local: write a compact report. Global: preserve the final comparison.

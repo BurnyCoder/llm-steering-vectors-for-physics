@@ -209,7 +209,8 @@ def phase_6_report(config: ExperimentConfig, results: list[EvaluationResult]) ->
 
     logger.info("Phase 6 report starting results=%d report_dir=%s", len(results), config.report_dir)
     print_result_table(results)  # Local: render table. Global: final experiment outcome.
-    markdown_path, csv_path = write_result_report(results, config.report_dir)  # Local: persist table. Global: preserve run output.
+    report_stem = config.format_run_artifact(config.report_stem)  # Local: align report files with this run. Global: avoid overwriting prior reports.
+    markdown_path, csv_path = write_result_report(results, config.report_dir, stem=report_stem)  # Local: persist table. Global: preserve run output.
     logger.info("Saved report: %s", markdown_path)  # Local: show human-readable artifact. Global: make report easy to find.
     logger.info("Saved report CSV: %s", csv_path)  # Local: show machine-readable artifact. Global: support later analysis.
     logger.info("Phase 6 report complete")
