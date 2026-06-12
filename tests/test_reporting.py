@@ -1,3 +1,4 @@
+from physics_steering_vectors import reporting
 from physics_steering_vectors.reporting import build_result_frame, print_result_table, write_result_report
 from physics_steering_vectors.schemas import EvaluationResult
 
@@ -42,6 +43,15 @@ def test_write_result_report_saves_markdown_and_csv(tmp_path) -> None:
     assert "Physics Steering Results" in markdown_path.read_text(encoding="utf-8")
     assert "steered" in markdown_path.read_text(encoding="utf-8")
     assert "label,correct,total,accuracy,delta_vs_baseline" in csv_path.read_text(encoding="utf-8")
+
+
+def test_write_result_report_defaults_to_timestamped_stem(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(reporting, "make_run_timestamp", lambda: "20260612_010203_456789")
+
+    markdown_path, csv_path = write_result_report([result("baseline", 1, 2)], tmp_path)
+
+    assert markdown_path == tmp_path / "results_20260612_010203_456789.md"
+    assert csv_path == tmp_path / "results_20260612_010203_456789.csv"
 
 
 def test_print_result_table_handles_empty_results(capsys) -> None:

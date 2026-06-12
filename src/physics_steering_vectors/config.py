@@ -12,7 +12,14 @@ Global Role:
 - Makes the experiment protocol explicit and easy to audit before running.
 """
 
-from dataclasses import dataclass  # Local: define immutable config objects. Global: keeps settings typed and centralized.
+from dataclasses import dataclass, field  # Local: define immutable config objects. Global: keeps settings typed and centralized.
+from datetime import datetime  # Local: generate artifact-safe run timestamps. Global: avoid overwriting logs and reports.
+
+
+def make_run_timestamp() -> str:
+    """Return a compact timestamp for run artifact filenames."""
+
+    return datetime.now().strftime("%Y%m%d_%H%M%S_%f")
 
 
 @dataclass(frozen=True)  # Local: make config immutable after construction. Global: prevents accidental protocol drift mid-run.
@@ -46,13 +53,22 @@ class ExperimentConfig:
     train_generations_per_question: int = 4  # Local: sampled attempts per validation row. Global: mine real correct/incorrect response pools.
     train_temperature: float = 0.8  # Local: diversify training generations. Global: improve odds of mixed correct/incorrect responses.
     train_top_p: float = 0.95  # Local: nucleus sampling for training generations. Global: keep sampled mining bounded but varied.
+    run_timestamp: str = field(default_factory=make_run_timestamp)  # Local: identify one run's generated files. Global: prevent artifact overwrites.
 
     layer_sweep: tuple[int, ...] = (6, 12, 18)  # Local: layers to train vectors on. Global: tests intervention location.
     multipliers: tuple[float, ...] = (0.5, 1.0, 1.5, 2.0)  # Local: steering strengths. Global: tests dose response.
     train_batch_size: int = 1  # Local: conservative activation batch. Global: reduces memory risk on small GPUs.
     steering_vector_dir: str = "artifacts/steering_vectors"  # Local: runtime vector artifact directory. Global: preserves trained interventions for later analysis.
     report_dir: str = "artifacts/reports"  # Local: runtime report artifact directory. Global: preserves result tables after long runs.
+    report_stem: str = "results_{run_timestamp}"  # Local: timestamped Markdown/CSV stem. Global: keep reports from overwriting previous runs.
     log_level: str = "DEBUG"  # Local: terminal verbosity. Global: make long experiment runs fully auditable by default.
     log_full_text: bool = True  # Local: print raw prompts/responses. Global: preserve exact LLM and steering-vector inputs in logs.
-    log_file_path: str | None = "artifacts/logs/latest.log"  # Local: optional run log path. Global: preserve terminal logs after long runs.
+    log_file_path: str | None = "artifacts/logs/run_{run_timestamp}.log"  # Local: optional timestamped run log path. Global: preserve terminal logs after long runs.
     do_sample: bool = False  # Local: deterministic generation. Global: makes accuracy deltas easier to interpret.
+
+    def format_run_artifact(self, value: str | None) -> str | None:
+        """Replace run timestamp placeholders in configured artifact names."""
+
+        if value is None:
+            return None
+        return value.replace("{run_timestamp}", self.run_timestamp).replace("{timestamp}", self.run_timestamp)

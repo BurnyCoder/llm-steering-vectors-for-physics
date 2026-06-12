@@ -129,20 +129,20 @@ def test_phase_5_steering_sweep_trains_each_layer_and_evaluates_each_multiplier(
 
 def test_phase_6_report_delegates_to_reporting(monkeypatch) -> None:
     results = [EvaluationResult(label="baseline", correct=0, total=1, accuracy=0.0, records=[])]
-    config = ExperimentConfig(report_dir="reports")
+    config = ExperimentConfig(report_dir="reports", run_timestamp="20260612_010203_456789")
     print_calls: list[list[EvaluationResult]] = []
-    write_calls: list[tuple[list[EvaluationResult], str]] = []
+    write_calls: list[tuple[list[EvaluationResult], str, str]] = []
     monkeypatch.setattr(phases, "print_result_table", lambda received: print_calls.append(received))
     monkeypatch.setattr(
         phases,
         "write_result_report",
-        lambda received, report_dir: write_calls.append((received, report_dir)) or ("report.md", "report.csv"),
+        lambda received, report_dir, stem=None: write_calls.append((received, report_dir, stem)) or ("report.md", "report.csv"),
     )
 
     phases.phase_6_report(config, results)
 
     assert print_calls == [results]
-    assert write_calls == [(results, "reports")]
+    assert write_calls == [(results, "reports", "results_20260612_010203_456789")]
 
 
 def test_main_orchestrates_all_phases(monkeypatch) -> None:

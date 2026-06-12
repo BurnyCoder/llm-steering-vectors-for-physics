@@ -1,3 +1,4 @@
+import re
 from dataclasses import FrozenInstanceError
 
 import pytest
@@ -18,9 +19,21 @@ def test_experiment_config_defaults_capture_protocol_settings() -> None:
     assert config.multipliers == (0.5, 1.0, 1.5, 2.0)
     assert config.steering_vector_dir == "artifacts/steering_vectors"
     assert config.report_dir == "artifacts/reports"
+    assert config.report_stem == "results_{run_timestamp}"
     assert config.log_level == "DEBUG"
     assert config.log_full_text is True
-    assert config.log_file_path == "artifacts/logs/latest.log"
+    assert config.log_file_path == "artifacts/logs/run_{run_timestamp}.log"
+    assert re.fullmatch(r"\d{8}_\d{6}_\d{6}", config.run_timestamp)
+
+
+def test_experiment_config_formats_run_artifact_placeholders() -> None:
+    config = ExperimentConfig(run_timestamp="20260612_010203_456789")
+
+    assert config.format_run_artifact(config.log_file_path) == (
+        "artifacts/logs/run_20260612_010203_456789.log"
+    )
+    assert config.format_run_artifact(config.report_stem) == "results_20260612_010203_456789"
+    assert config.format_run_artifact(None) is None
 
 
 def test_experiment_config_is_frozen() -> None:
