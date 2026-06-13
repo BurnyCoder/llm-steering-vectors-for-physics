@@ -1,0 +1,3 @@
+[submodule "src/ALS"]
+	path = src/ALS
+	url = https://github.com/BurnyCoder/ALS.git
