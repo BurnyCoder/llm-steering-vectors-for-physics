@@ -21,7 +21,7 @@ uv run physics-steering
 uv run python -m physics_steering_vectors
 ```
 
-For a quick smoke run, temporarily set `max_test_examples` to a small value such as `25` and consider lowering `train_generations_per_question` in `src/physics_steering_vectors/config.py`, then run `uv run physics-steering`. Restore protocol-affecting settings before benchmark-quality runs.
+`max_test_examples` currently defaults to `5` in `src/physics_steering_vectors/config.py`, a smoke-test cap; set it to `None` for a full benchmark run. For a quick smoke run, keep a small value such as `5` or `25` and consider lowering `train_generations_per_question` in `src/physics_steering_vectors/config.py`, then run `uv run physics-steering`. Restore protocol-affecting settings before benchmark-quality runs.
 
 ## Coding Style & Naming Conventions
 
