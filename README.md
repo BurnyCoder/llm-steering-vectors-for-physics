@@ -85,13 +85,14 @@ uv run pytest
 The full run may take a while because it loads the model, trains several steering vectors, and
 evaluates multiple conditions.
 
-For a quick experiment smoke test, temporarily set this field in
-`src/physics_steering_vectors/config.py`:
+The committed default in `src/physics_steering_vectors/config.py` is currently a smoke-test cap
+that evaluates only the first 5 test Physics rows:
 
 ```python
-max_test_examples: int | None = 25
+max_test_examples: int | None = 5
 ```
 
+For a quick experiment smoke test, keep this cap or set it to another small value such as `25`.
 Then run:
 
 ```bash
@@ -101,11 +102,16 @@ uv run physics-steering
 You can also lower `train_generations_per_question` while checking plumbing, as long as you restore
 protocol-affecting settings before any benchmark-quality run.
 
-For the real benchmark run, set it back to:
+For the real benchmark run, set it to:
 
 ```python
 max_test_examples: int | None = None
 ```
+
+With `None`, all MMLU-Pro Physics test rows are evaluated. In the Hugging Face copy of
+`TIGER-Lab/MMLU-Pro` the `physics` category has 1,299 test rows and 5 validation rows, so steering
+vectors are trained from at most `5 * train_generations_per_question` sampled responses (20 with the
+default of 4).
 
 ## Steering Vector Artifacts
 
@@ -150,7 +156,8 @@ The script prints:
 6. Progress for baseline evaluation.
 7. Progress for each trained steering vector and steered evaluation.
 8. Saved steering-vector artifact paths, one per trained layer.
-9. A final table like:
+9. A final table with this shape (the numbers below are illustrative placeholders, not measured
+   results; no benchmark results are committed to this repository):
 
 ```text
               label  correct  total  accuracy  delta_vs_baseline
@@ -225,6 +232,11 @@ baseline accuracy vs steered accuracy
 - Report artifacts: saved under `report_dir`, which defaults to `artifacts/reports`.
 - Logging: defaults to `DEBUG`, prints full prompts/completions/steering inputs, and writes the same stream to `log_file_path`.
 - Evaluation decoding: deterministic by default through `do_sample=False`.
+- Inherited decoding defaults: settings the code does not pass to `generate()` come from the
+  checkpoint's
+  [`generation_config.json`](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/blob/main/generation_config.json),
+  which sets `repetition_penalty=1.1` (applied in both evaluation and mining) and `top_k=20`
+  (applied when mining samples with `do_sample=True`).
 - Activation collection: `activation_collection.py` mines and pairs generated validation responses for vector training.
 - Shared generation: `generation.py` owns model completion for both activation collection and evaluation.
 
@@ -237,8 +249,12 @@ loaded module names before training or applying steering vectors.
 ```text
 .
 ├── .gitignore
+├── .gitmodules
 ├── .python-version
+├── .vscode
+│   └── launch.json
 ├── AGENTS.md
+├── ALS                (git submodule: https://github.com/BurnyCoder/ALS.git)
 ├── paper
 │   └── paper.tex
 ├── paper.pdf
@@ -300,7 +316,7 @@ Key dependencies:
 - `pandas`: result table formatting.
 - `requests`: fetch the official MMLU-Pro prompt template.
 - `tqdm`: progress bars.
-- `accelerate`: model device placement through `device_map="auto"`.
+- `accelerate`: model device placement through `device_map="auto"` (passed only when CUDA is available).
 - `pytest`: unit test runner for deterministic logic.
 
 ### `.python-version` and `uv.lock`
@@ -344,7 +360,7 @@ Important fields:
 - `subject`: MMLU-Pro category filter.
 - `layer_sweep`: decoder layers where vectors are trained.
 - `multipliers`: steering strengths tested at generation time.
-- `max_test_examples`: optional cap for smoke tests.
+- `max_test_examples`: optional cap on test rows; currently `5` (smoke test), `None` for the full test split.
 - `train_generations_per_question`: sampled unsteered completions to mine per validation row.
 - `train_temperature`: sampling temperature used only while mining training responses.
 - `train_top_p`: nucleus sampling value used only while mining training responses.
@@ -464,7 +480,8 @@ Global role:
 - Produces the activation intervention that is later applied during benchmark generation and saved for reuse.
 
 The current implementation trains one vector per selected layer, using the final token activation
-from each positive/negative prompt pair. Saved vector artifacts live under
+from each positive/negative prompt-plus-completion pair. The steering-vectors library's default
+`mean_aggregator()` averages the positive-minus-negative differences over the pairs. Saved vector artifacts live under
 `artifacts/steering_vectors/` by default.
 
 ### `src/physics_steering_vectors/evaluation.py`
