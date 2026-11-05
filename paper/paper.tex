@@ -10,7 +10,7 @@
 \maketitle
 
 \begin{abstract}
-This paper tests whether activation steering improves a small Qwen language model on MMLU-Pro Physics questions. Correct and incorrect unsteered validation generations are mined, paired, and used to train layer-specific steering vectors from final-token activations. Each steering vector is computed as a mean activation difference, then applied by adding it to a selected model layer with a chosen scaling factor. Steered held-out test accuracy is compared with an unsteered baseline.
+This paper formalizes an experiment that tests whether activation steering improves a small Qwen language model on MMLU-Pro Physics questions; it reports no benchmark results. Correct and incorrect unsteered validation generations are mined, paired, and used to train layer-specific steering vectors from final-token activations. Each steering vector is computed as a mean activation difference, then applied by adding it to a selected model layer with a chosen scaling factor. Steered held-out test accuracy is compared with an unsteered baseline.
 \end{abstract}
 
 \section{Mathematical Formulation}
@@ -124,7 +124,7 @@ Let \(\mathbf 1[E]\in\{0,1\}\) be \(1\) if event \(E\) is true and \(0\) otherwi
 
 \subsection*{Paper's Codebase Uses}
 
-Paper's codebase uses \(M_\theta=\text{Qwen3.5-0.8B}\), a Qwen3.5 autoregressive transformer.
+Paper's codebase uses \(M_\theta=\text{Qwen2.5-0.5B-Instruct}\), a Qwen2 decoder-only autoregressive transformer with 24 decoder layers (\url{https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/blob/main/config.json}).
 It sets
 
 \[
@@ -137,6 +137,11 @@ q=0.95,
 \mathcal L=\{6,12,18\},\quad
 \mathcal A=\{0.5,1.0,1.5,2.0\}.
 \]
+
+The codebase departs from the formulation above in three ways.
+First, generation wraps each prompt in the tokenizer's chat template, with the line ``Answer: Let's think step by step.'' as a prefilled assistant turn, so the generation input is a chat-formatted token string rather than \(\operatorname{tok}(s)\); the training activations \(h_{\ell,t}\) are read from the raw text \(p_i\Vert g_{ik}\) without the chat template.
+Second, decoding settings that the code does not set are inherited from the checkpoint's generation configuration (\url{https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/blob/main/generation_config.json}): sampling also uses \(\text{top-}k=20\), and both sampling and evaluation use a repetition penalty of \(1.1\); evaluation completions \(y_r^{(c)}\) are decoded greedily.
+Third, the default configuration caps the test rows at the first \(m=5\) Physics rows; the MMLU-Pro Physics category has \(u=5\) validation rows and \(1{,}299\) test rows.
 
 \begin{thebibliography}{1}
 
